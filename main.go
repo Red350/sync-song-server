@@ -13,39 +13,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// TODO: might need to mess around with the size of the channel, assuming we even want to use buffered channels at all.
-var outgoingMessages = make(chan string, 10)
-var clients = []Client{}
-var nextClientID = 0
-
-type Client struct {
-	Conn     *websocket.Conn
-	ID       int
-	Incoming chan string
-	Outgoing chan string
-}
-
-func NewClient(conn *websocket.Conn) Client {
-	nextClientID++
-	return Client{
-		conn,
-		nextClientID,
-		make(chan string, 10),
-		make(chan string, 10),
-	}
-}
-
-type Lobby struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	NumMembers int    `json:"numMembers,omitempty"`
-}
-
-var Lobbies = []Lobby{
-	{"AAAA", "Lobby 1", 3},
-	{"BBBB", "Lobby 2", 4},
-	{"CCCC", "Lobby 3", 1},
-}
+var Lobbies = []Lobby{}
+var Lobb = NewLobby("AAAA", "Lobby 1")
 
 func sayHello(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("request received")
@@ -98,60 +67,25 @@ func CreateLobby(w http.ResponseWriter, r *http.Request) {
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("wsHandler request received: %s", *r)
+	log.Print("wsHandler request received")
 
 	conn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
 	if err != nil {
 		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
 		return
 	}
-	client := NewClient(conn)
-	clients = append(clients, client)
-	go sendMessages(client)
-	go readIncomingMessages(client)
-}
-
-func sendMessages(c Client) {
-	for {
-		select {
-		case outMsg := <-c.Outgoing:
-			if err := c.Conn.WriteMessage(websocket.TextMessage, []byte(outMsg)); err != nil {
-				log.Printf("Websocket error: %s", err)
-			}
-		case inMsg := <-c.Incoming:
-			log.Printf("Received message: %s", inMsg)
-			for _, other := range clients {
-				log.Printf("checking client %s", other)
-				if other.ID != c.ID {
-					log.Printf("Sending message: %s to %v", inMsg, other)
-					if err := other.Conn.WriteMessage(websocket.TextMessage, []byte(inMsg)); err != nil {
-						log.Printf("Websocket error: %s", err)
-					}
-				}
-			}
-		}
-	}
-}
-
-func readIncomingMessages(c Client) {
-	for {
-		_, msg, err := c.Conn.ReadMessage()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		msgString := string(msg)
-		c.Incoming <- msgString
-	}
+	// TODO pass the lobby id as part of the join command
+	Lobb.join(conn)
 }
 
 func consoleReader() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		input, _ := reader.ReadString('\n')
-		log.Printf("Sending message %s to clients %v", input, clients)
-		for _, c := range clients {
-			c.Outgoing <- input
+		for _, l := range Lobbies {
+			for _, c := range l.Clients {
+				c.Send(Message{ClientID: -1, Content: input})
+			}
 		}
 	}
 }
