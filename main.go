@@ -44,14 +44,21 @@ func GetLobby(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateLobby(w http.ResponseWriter, r *http.Request) {
-	log.Print("CreateLobby request received")
+	id := r.FormValue("id")
+	name := r.FormValue("name")
+	log.Printf("CreateLobby request received: Name: %q, ID: %q", name, id)
 
-	id := r.Form.Get("id")
-	name := r.Form.Get("name")
-	fmt.Println(id, name)
-	log.Print("hello: %s", id)
+	if _, ok := Lobbies[id]; ok {
+		log.Printf("Lobby with ID %q already exists", id)
+		w.Write([]byte(fmt.Sprintf("Lobby with ID %q already exists", id)))
+		return
+	}
 
-	w.Write([]byte("asdf"))
+	l := NewLobby(id, name)
+	Lobbies[id] = l
+	log.Printf("Lobby %q has been created with ID %q", name, id)
+
+	w.Write([]byte(fmt.Sprintf("Lobby created with ID %q", id)))
 }
 
 func JoinLobby(w http.ResponseWriter, r *http.Request) {
@@ -65,8 +72,14 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if l, ok := Lobbies[id]; ok {
-		clientID := l.join(conn)
-		log.Printf("Client %d has joined Lobby %q", clientID, l.ID)
+		client := l.join(conn)
+		log.Printf("Client %d has joined Lobby %q", client.ID, l.ID)
+		client.Send(
+			Message{
+				ClientID: -1,
+				Content:  fmt.Sprintf("{name: %s}", l.Name),
+			},
+		)
 	} else {
 		log.Printf("Lobby with ID %q does not exist", id)
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseUnsupportedData, "Lobby does not exist"))
@@ -98,9 +111,6 @@ func main() {
 	router.HandleFunc("/lobbies/{id}/join", JoinLobby).Methods("GET")
 	router.HandleFunc("/lobbies/create", CreateLobby).Methods("POST")
 
-	//router.HandleFunc("/ws", wsHandler)
-
 	fmt.Println("Starting server")
 	log.Fatal(http.ListenAndServe(":8080", router))
-	fmt.Println("here i am")
 }

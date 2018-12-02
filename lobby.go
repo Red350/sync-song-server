@@ -17,11 +17,11 @@ func (m Message) String() string {
 }
 
 type Lobby struct {
-	ID           string       `json:"id,omitempty"`
+	ID           string       `json:"-"`
 	Name         string       `json:"name,omitempty"`
 	Clients      []Client     `json:"-"`
 	NextClientID int          `json:"-"`
-	NumMembers   int          `json:"numMembers,omitempty"`
+	NumMembers   int          `json:"-"`
 	InMsgs       chan Message `json:"-"`
 }
 
@@ -40,7 +40,7 @@ func NewLobby(id, name string) *Lobby {
 	return &lobby
 }
 
-func (l *Lobby) join(conn *websocket.Conn) int {
+func (l *Lobby) join(conn *websocket.Conn) Client {
 	client := NewClient(conn, l.NextClientID, l.InMsgs)
 	l.NextClientID++
 	l.NumMembers++
@@ -48,7 +48,7 @@ func (l *Lobby) join(conn *websocket.Conn) int {
 	go client.ReadIncomingMessages()
 
 	l.Clients = append(l.Clients, client)
-	return client.ID
+	return client
 }
 
 func listenForClientMsgs(l *Lobby) {
@@ -60,7 +60,7 @@ func listenForClientMsgs(l *Lobby) {
 		for _, c := range l.Clients {
 			log.Printf("Sending message to %d", c.ID)
 			if err := c.Send(msg); err != nil {
-				fmt.Printf("Failed to send message %s to %d: %s", msg, c.ID, err)
+				log.Printf("Failed to send message %s to %d: %s", msg, c.ID, err)
 			}
 		}
 	}
