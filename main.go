@@ -13,8 +13,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var Lobbies = []Lobby{}
-var Lobb = NewLobby("AAAA", "Lobby 1")
+var Lobb = NewLobby("a", "Lobby 1")
+var Lobbies = make(map[string]*Lobby)
 
 func sayHello(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("request received")
@@ -26,13 +26,13 @@ func sayHello(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetLobbies(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GetLobbies request received: %s", *r)
+	log.Print("GetLobbies request received")
 
 	json.NewEncoder(w).Encode(Lobbies)
 }
 
 func GetLobby(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GetLobby request received: %s", *r)
+	log.Printf("GetLobby request received")
 
 	var params = mux.Vars(r)
 
@@ -43,39 +43,36 @@ func GetLobby(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func JoinLobby(w http.ResponseWriter, r *http.Request) {
-	log.Printf("JoinLobby request received: %s", *r)
-
-	var params = mux.Vars(r)
-
-	for i, lobby := range Lobbies {
-		if lobby.ID == params["id"] {
-			fmt.Printf("Found lobby: %s\n", lobby)
-			Lobbies[i].NumMembers++
-			json.NewEncoder(w).Encode(Lobbies[i])
-		}
-	}
-}
-
 func CreateLobby(w http.ResponseWriter, r *http.Request) {
-	log.Printf("CreateLobby request received: %s", *r)
+	log.Print("CreateLobby request received")
 
 	id := r.Form.Get("id")
-	fmt.Println(id)
+	name := r.Form.Get("name")
+	fmt.Println(id, name)
+	log.Print("hello: %s", id)
 
 	w.Write([]byte("asdf"))
 }
 
-func wsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Print("wsHandler request received")
+func JoinLobby(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	log.Printf("JoinLobby request received: %s", id)
 
 	conn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
 	if err != nil {
 		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
 		return
 	}
-	// TODO pass the lobby id as part of the join command
-	Lobb.join(conn)
+
+	if l, ok := Lobbies[id]; ok {
+		clientID := l.join(conn)
+		log.Printf("Client %d has joined Lobby %q", clientID, l.ID)
+	} else {
+		log.Printf("Lobby with ID %q does not exist", id)
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseUnsupportedData, "Lobby does not exist"))
+		conn.Close()
+		return
+	}
 }
 
 func consoleReader() {
@@ -91,6 +88,7 @@ func consoleReader() {
 }
 
 func main() {
+	Lobbies["a"] = Lobb
 	go consoleReader()
 	router := mux.NewRouter()
 
@@ -98,9 +96,9 @@ func main() {
 	router.HandleFunc("/lobbies", GetLobbies).Methods("GET")
 	router.HandleFunc("/lobbies/{id}", GetLobby).Methods("GET")
 	router.HandleFunc("/lobbies/{id}/join", JoinLobby).Methods("GET")
-	router.HandleFunc("/lobbies/create", JoinLobby).Methods("POST")
+	router.HandleFunc("/lobbies/create", CreateLobby).Methods("POST")
 
-	router.HandleFunc("/ws", wsHandler)
+	//router.HandleFunc("/ws", wsHandler)
 
 	fmt.Println("Starting server")
 	log.Fatal(http.ListenAndServe(":8080", router))

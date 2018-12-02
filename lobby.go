@@ -40,7 +40,7 @@ func NewLobby(id, name string) *Lobby {
 	return &lobby
 }
 
-func (l *Lobby) join(conn *websocket.Conn) {
+func (l *Lobby) join(conn *websocket.Conn) int {
 	client := NewClient(conn, l.NextClientID, l.InMsgs)
 	l.NextClientID++
 	l.NumMembers++
@@ -48,7 +48,7 @@ func (l *Lobby) join(conn *websocket.Conn) {
 	go client.ReadIncomingMessages()
 
 	l.Clients = append(l.Clients, client)
-	log.Printf("Client %d has joined Lobby %s, now has %d members", client.ID, l.ID, l.NumMembers)
+	return client.ID
 }
 
 func listenForClientMsgs(l *Lobby) {
