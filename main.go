@@ -7,23 +7,12 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
-var Lobb = NewLobby("a", "Lobby 1")
 var Lobbies = make(map[string]*Lobby)
-
-func sayHello(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("request received")
-	message := r.URL.Path
-	message = strings.TrimPrefix(message, "/")
-	message = "Hello " + message
-
-	w.Write([]byte(message))
-}
 
 func GetLobbies(w http.ResponseWriter, r *http.Request) {
 	log.Print("GetLobbies request received")
@@ -101,11 +90,9 @@ func consoleReader() {
 }
 
 func main() {
-	Lobbies["a"] = Lobb
 	go consoleReader()
 	router := mux.NewRouter()
 
-	router.HandleFunc("/", sayHello).Methods("GET")
 	router.HandleFunc("/lobbies", GetLobbies).Methods("GET")
 	router.HandleFunc("/lobbies/{id}", GetLobby).Methods("GET")
 	router.HandleFunc("/lobbies/{id}/join", JoinLobby).Methods("GET")
