@@ -17,18 +17,22 @@ func (m Message) String() string {
 }
 
 type Lobby struct {
-	ID           string       `json:"-"`
-	Name         string       `json:"name,omitempty"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	Genre        string       `json:"genre"`
+	Public       bool         `json:"public"`
 	Clients      []Client     `json:"-"`
 	NextClientID int          `json:"-"`
-	NumMembers   int          `json:"-"`
+	NumMembers   int          `json:"numMembers"`
 	InMsgs       chan Message `json:"-"`
 }
 
-func NewLobby(id, name string) *Lobby {
+func NewLobby(id, name, genre string, public bool) *Lobby {
 	lobby := Lobby{
 		ID:           id,
 		Name:         name,
+		Genre:        genre,
+		Public:       public,
 		Clients:      []Client{},
 		NextClientID: 0,
 		NumMembers:   0,

@@ -5,14 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
 var Lobbies = make(map[string]*Lobby)
+
+// TODO move this to somewhere better
+// Courtesy of https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go/31832326#31832326
+const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func RandStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
 
 func GetLobbies(w http.ResponseWriter, r *http.Request) {
 	log.Print("GetLobbies request received")
@@ -33,9 +47,14 @@ func GetLobby(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateLobby(w http.ResponseWriter, r *http.Request) {
-	id := r.FormValue("id")
+	id := RandStringBytes(4)
 	name := r.FormValue("name")
-	log.Printf("CreateLobby request received: Name: %q, ID: %q", name, id)
+	genre := r.FormValue("genre")
+	public, err := strconv.ParseBool(r.FormValue("public"))
+	if err != nil {
+		log.Fatal("Public bool formatted incorrectly: %s", err)
+	}
+	log.Printf("CreateLobby request received: Name: %q, ID: %q, Genre: %q, Public: %t", name, id, genre, public)
 
 	if _, ok := Lobbies[id]; ok {
 		log.Printf("Lobby with ID %q already exists", id)
@@ -43,7 +62,7 @@ func CreateLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l := NewLobby(id, name)
+	l := NewLobby(id, name, genre, public)
 	Lobbies[id] = l
 	log.Printf("Lobby %q has been created with ID %q", name, id)
 
