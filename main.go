@@ -71,7 +71,8 @@ func CreateLobby(w http.ResponseWriter, r *http.Request) {
 
 func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	log.Printf("JoinLobby request received: %s", id)
+	username := r.URL.Query()["username"][0]
+	log.Printf("JoinLobby request received: ID: %s, username: %s", id, username)
 
 	conn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
 	if err != nil {
@@ -80,12 +81,12 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if l, ok := Lobbies[id]; ok {
-		client := l.join(conn)
-		log.Printf("Client %d has joined Lobby %q", client.ID, l.ID)
+		client := l.join(conn, username)
+		log.Printf("%s has joined lobby %q", client.Username, l.ID)
+		// TODO send the currently played song.
 		client.Send(
 			Message{
-				ClientID: -1,
-				Content:  fmt.Sprintf("{name: %s}", l.Name),
+				Content: fmt.Sprintf("{name: %s}", l.Name),
 			},
 		)
 	} else {
@@ -96,25 +97,26 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func consoleReader() {
+func consoleBroadcaster() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		input, _ := reader.ReadString('\n')
 		for _, l := range Lobbies {
 			for _, c := range l.Clients {
-				c.Send(Message{ClientID: -1, Content: input})
+				log.Printf("Sending %s to %s", input, c.Username)
+				c.Send(Message{Content: input})
 			}
 		}
 	}
 }
 
 func main() {
-	go consoleReader()
+	go consoleBroadcaster()
 	router := mux.NewRouter()
 
 	router.HandleFunc("/lobbies", GetLobbies).Methods("GET")
 	router.HandleFunc("/lobbies/{id}", GetLobby).Methods("GET")
-	router.HandleFunc("/lobbies/{id}/join", JoinLobby).Methods("GET")
+	router.HandleFunc("/lobbies/{id}/join", JoinLobby).Queries("username", "").Methods("GET")
 	router.HandleFunc("/lobbies/create", CreateLobby).Methods("POST")
 
 	fmt.Println("Starting server")

@@ -6,26 +6,33 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Client represents a single user who is connected to the server.
 type Client struct {
-	Conn    *websocket.Conn
-	ID      int
-	InMsgs  chan Message
-	OutMsgs chan string
+	Conn     *websocket.Conn
+	Username string
+	InMsgs   chan Message
+	OutMsgs  chan string
 }
 
-func NewClient(conn *websocket.Conn, id int, inMsgs chan Message) Client {
+// NewClient is a convenience method for initialising a Client.
+func NewClient(conn *websocket.Conn, username string, inMsgs chan Message) Client {
 	return Client{
-		Conn:    conn,
-		ID:      id,
-		InMsgs:  inMsgs,
-		OutMsgs: make(chan string, 10),
+		Conn:     conn,
+		Username: username,
+		InMsgs:   inMsgs,
+		OutMsgs:  make(chan string, 10),
 	}
 }
 
+// Send sends a message to this client using their websocket.
 func (c *Client) Send(msg Message) error {
+	log.Printf("Sending message %q to %s", msg, c.Username)
 	return c.Conn.WriteMessage(websocket.TextMessage, []byte(msg.String()))
 }
 
+// ReadIncomingMessages loops forever, reading incoming messages from this client's connection,
+// and puts them in the InMsg channel.
+// Should be called asynchronously.
 func (c *Client) ReadIncomingMessages() {
 	for {
 		_, msg, err := c.Conn.ReadMessage()
@@ -33,6 +40,6 @@ func (c *Client) ReadIncomingMessages() {
 			log.Println(err)
 			return
 		}
-		c.InMsgs <- Message{c.ID, string(msg)}
+		c.InMsgs <- Message{c.Username, string(msg)}
 	}
 }
