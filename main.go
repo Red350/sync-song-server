@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const ID_LENGTH = 4
+
 var Lobbies = make(map[string]*Lobby)
 
 // TODO move this to somewhere better
@@ -24,6 +26,16 @@ func RandStringBytes(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+// Generate random lobby IDs until one of them is unique.
+func UniqueLobbyID() string {
+	for {
+		id := RandStringBytes(ID_LENGTH)
+		if _, exists := Lobbies[id]; !exists {
+			return id
+		}
+	}
 }
 
 func GetLobbies(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +57,7 @@ func GetLobby(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateLobby(w http.ResponseWriter, r *http.Request) {
-	id := RandStringBytes(4)
+	id := UniqueLobbyID()
 	name := r.FormValue("name")
 	genre := r.FormValue("genre")
 	public, err := strconv.ParseBool(r.FormValue("public"))
@@ -53,12 +65,6 @@ func CreateLobby(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Public bool formatted incorrectly: %s", err)
 	}
 	log.Printf("CreateLobby request received: Name: %q, ID: %q, Genre: %q, Public: %t", name, id, genre, public)
-
-	if _, ok := Lobbies[id]; ok {
-		log.Printf("Lobby with ID %q already exists", id)
-		w.Write([]byte(fmt.Sprintf("Lobby with ID %q already exists", id)))
-		return
-	}
 
 	l := NewLobby(id, name, genre, public)
 	Lobbies[id] = l
