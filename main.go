@@ -57,15 +57,15 @@ func GetLobby(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateLobby(w http.ResponseWriter, r *http.Request) {
-	id := UniqueLobbyID()
 	name := r.FormValue("name")
 	genre := r.FormValue("genre")
 	public, err := strconv.ParseBool(r.FormValue("public"))
 	if err != nil {
 		log.Fatal("Public bool formatted incorrectly: %s", err)
 	}
-	log.Printf("CreateLobby request received: Name: %q, ID: %q, Genre: %q, Public: %t", name, id, genre, public)
+	log.Printf("CreateLobby request received: Name: %q, Genre: %q, Public: %t", name, genre, public)
 
+	id := UniqueLobbyID()
 	l := NewLobby(id, name, genre, public)
 	Lobbies[id] = l
 	log.Printf("Lobby %q has been created with ID %q", name, id)
@@ -98,7 +98,16 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// This is here for convenience during developement.
+func initialiseTestLobby() {
+	id := UniqueLobbyID()
+	l := NewLobby(id, "Test Lobby", "Whatev", true)
+	Lobbies[id] = l
+	log.Printf("Test lobby created. Remove this before deployment.")
+}
+
 func main() {
+	initialiseTestLobby()
 	router := mux.NewRouter()
 
 	router.HandleFunc("/lobbies", GetLobbies).Methods("GET")
