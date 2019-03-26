@@ -102,6 +102,12 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 func initialiseTestLobby() {
 	id := UniqueLobbyID()
 	l := NewLobby(id, "Test Lobby", "Whatev", true)
+	l.CurrentTrack = Track{
+		URI:      "spotify:track:5ZrrXIYTvjXPKVQMjqaumR",
+		Name:     "Something",
+		Artist:   "Else",
+		Position: 5555,
+	}
 	Lobbies[id] = l
 	log.Printf("Test lobby created. Remove this before deployment.")
 }
@@ -115,6 +121,6 @@ func main() {
 	router.HandleFunc("/lobbies/{id}/join", JoinLobby).Queries("username", "").Methods("GET")
 	router.HandleFunc("/lobbies/create", CreateLobby).Methods("POST")
 
-	fmt.Println("Starting server")
+	log.Printf("Starting server")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

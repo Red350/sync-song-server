@@ -11,7 +11,7 @@ type Track struct {
 	URI string `json:"uri,omitempty"`
 
 	// Name of the track.
-	Name string `name:"name,omitempty"`
+	Name string `json:"name,omitempty"`
 
 	// Name of the artist.
 	Artist string `json:"artist,omitempty"`
@@ -25,19 +25,14 @@ type Message struct {
 	Username string `json:"username,omitempty"`
 
 	// Spotify URI of the current track in this lobby.
-	CurrentTrack Track `json:"currentTrack,omitempty`
+	CurrentTrack Track `json:"currentTrack,omitempty"`
 
 	// Command for the user to perform e.g. play/pause.
-	Command string `json:"command,omitempty`
+	Command string `json:"command,omitempty"`
 
 	// User messages.
-	UserMsg string `json:"userMsg,omitemtpy`
+	UserMsg string `json:"userMsg,omitemtpy"`
 }
-
-// I don't think this is needed anymore, now that we're JSONifying the messages.
-//func (m Message) String() string {
-//	return fmt.Sprintf("{Username: %s, Content: %q}", m.Username, m.Content)
-//}
 
 type Lobby struct {
 	ID           string       `json:"id"`
