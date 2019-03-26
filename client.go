@@ -27,7 +27,7 @@ func NewClient(conn *websocket.Conn, username string, inMsgs chan Message) Clien
 // Send sends a message to this client using their websocket.
 func (c *Client) Send(msg Message) error {
 	log.Printf("Sending message %q to %s", msg, c.Username)
-	return c.Conn.WriteMessage(websocket.TextMessage, []byte(msg.String()))
+	return c.Conn.WriteJSON(msg)
 }
 
 // ReadIncomingMessages loops forever, reading incoming messages from this client's connection,
@@ -35,11 +35,12 @@ func (c *Client) Send(msg Message) error {
 // Should be called asynchronously.
 func (c *Client) ReadIncomingMessages() {
 	for {
-		_, msg, err := c.Conn.ReadMessage()
-		if err != nil {
+		msg := Message{}
+		if err := c.Conn.ReadJSON(&msg); err != nil {
 			log.Println(err)
 			return
 		}
-		c.InMsgs <- Message{c.Username, string(msg)}
+		msg.Username = c.Username
+		c.InMsgs <- msg
 	}
 }

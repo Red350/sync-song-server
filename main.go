@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -80,15 +78,12 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if l, ok := Lobbies[id]; ok {
-		client := l.join(conn, username)
-		log.Printf("%s has joined lobby %q", client.Username, l.ID)
-		// TODO send the currently played song.
-		client.Send(
-			Message{
-				Content: fmt.Sprintf("{name: %s}", l.Name),
-			},
-		)
+	if lobby, ok := Lobbies[id]; ok {
+		client := lobby.join(conn, username)
+		log.Printf("%s has joined lobby %q", client.Username, lobby.ID)
+
+		// Send the state of the lobby to the client.
+		lobby.sendState(&client)
 	} else {
 		log.Printf("Lobby with ID %q does not exist", id)
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseUnsupportedData, "Lobby does not exist"))
@@ -97,21 +92,7 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func consoleBroadcaster() {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		input, _ := reader.ReadString('\n')
-		for _, l := range Lobbies {
-			for _, c := range l.Clients {
-				log.Printf("Sending %s to %s", input, c.Username)
-				c.Send(Message{Content: input})
-			}
-		}
-	}
-}
-
 func main() {
-	go consoleBroadcaster()
 	router := mux.NewRouter()
 
 	router.HandleFunc("/lobbies", GetLobbies).Methods("GET")

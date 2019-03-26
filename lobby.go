@@ -1,29 +1,53 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/gorilla/websocket"
 )
 
-type Message struct {
-	Username string
-	Content  string
+type Track struct {
+	// Spotify URI for this track.
+	URI string `json:"uri,omitempty"`
+
+	// Name of the track.
+	Name string `name:"name,omitempty"`
+
+	// Name of the artist.
+	Artist string `json:"artist,omitempty"`
+
+	// Song position in millis.
+	Position int64 `json:"position,omitempty"`
 }
 
-func (m Message) String() string {
-	return fmt.Sprintf("{Username: %s, Content: %q}", m.Username, m.Content)
+type Message struct {
+	// Who the message originated from (empty string implies the server).
+	Username string `json:"username,omitempty"`
+
+	// Spotify URI of the current track in this lobby.
+	CurrentTrack Track `json:"currentTrack,omitempty`
+
+	// Command for the user to perform e.g. play/pause.
+	Command string `json:"command,omitempty`
+
+	// User messages.
+	UserMsg string `json:"userMsg,omitemtpy`
 }
+
+// I don't think this is needed anymore, now that we're JSONifying the messages.
+//func (m Message) String() string {
+//	return fmt.Sprintf("{Username: %s, Content: %q}", m.Username, m.Content)
+//}
 
 type Lobby struct {
-	ID         string       `json:"id"`
-	Name       string       `json:"name"`
-	Genre      string       `json:"genre"`
-	Public     bool         `json:"public"`
-	Clients    []Client     `json:"-"`
-	NumMembers int          `json:"numMembers"`
-	InMsgs     chan Message `json:"-"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	Genre        string       `json:"genre"`
+	CurrentTrack Track        `json:"currentTrack`
+	Public       bool         `json:"public"`
+	Clients      []Client     `json:"-"`
+	NumMembers   int          `json:"numMembers"`
+	InMsgs       chan Message `json:"-"`
 }
 
 func NewLobby(id, name, genre string, public bool) *Lobby {
@@ -57,7 +81,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 func listenForClientMsgs(l *Lobby) {
 	for {
 		msg := <-l.InMsgs
-		log.Printf("Received message: %q from client %d", msg.Content, msg.Username)
+		log.Printf("Received message: %q from client %d", msg, msg.Username)
 		// TODO currently this echoes the message back to the client that sent it.
 		// May want to change that in the future.
 		for _, c := range l.Clients {
@@ -66,4 +90,11 @@ func listenForClientMsgs(l *Lobby) {
 			}
 		}
 	}
+}
+
+// Send the current state of the lobby to a client.
+func (l *Lobby) sendState(c *Client) {
+	state := Message{CurrentTrack: l.CurrentTrack}
+	log.Printf("Sending lobby state %q to %s", state, c.Username)
+	c.Send(state)
 }
