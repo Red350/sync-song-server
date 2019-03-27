@@ -59,14 +59,15 @@ func GetLobby(w http.ResponseWriter, r *http.Request) {
 func CreateLobby(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	genre := r.FormValue("genre")
+	admin := r.FormValue("admin")
 	public, err := strconv.ParseBool(r.FormValue("public"))
 	if err != nil {
 		log.Fatal("Public bool formatted incorrectly: %s", err)
 	}
-	log.Printf("CreateLobby request received: Name: %q, Genre: %q, Public: %t", name, genre, public)
+	log.Printf("CreateLobby request received: Name: %q, Genre: %q, Public: %t, Admin: %s", name, genre, public, admin)
 
 	id := UniqueLobbyID()
-	l := NewLobby(id, name, genre, public)
+	l := NewLobby(id, name, genre, public, admin)
 	Lobbies[id] = l
 	log.Printf("Lobby %q has been created with ID %q", name, id)
 
@@ -101,7 +102,7 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 // This is here for convenience during developement.
 func initialiseTestLobby() {
 	id := UniqueLobbyID()
-	l := NewLobby(id, "Test Lobby", "Whatev", true)
+	l := NewLobby(id, "Test Lobby", "Whatev", true, "red350")
 	l.CurrentTrack = Track{
 		URI:      "spotify:track:5ZrrXIYTvjXPKVQMjqaumR",
 		Name:     "Something",

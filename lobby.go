@@ -31,26 +31,28 @@ type Message struct {
 	Command string `json:"command,omitempty"`
 
 	// User messages.
-	UserMsg string `json:"userMsg,omitemtpy"`
+	UserMsg string `json:"userMsg,omitempty"`
 }
 
 type Lobby struct {
 	ID           string       `json:"id"`
 	Name         string       `json:"name"`
 	Genre        string       `json:"genre"`
-	CurrentTrack Track        `json:"currentTrack`
 	Public       bool         `json:"public"`
+	Admin        string       `json:"admin"`
+	CurrentTrack Track        `json:"currentTrack`
 	Clients      []Client     `json:"-"`
 	NumMembers   int          `json:"numMembers"`
 	InMsgs       chan Message `json:"-"`
 }
 
-func NewLobby(id, name, genre string, public bool) *Lobby {
+func NewLobby(id, name, genre string, public bool, admin string) *Lobby {
 	lobby := Lobby{
 		ID:         id,
 		Name:       name,
 		Genre:      genre,
 		Public:     public,
+		Admin:      admin,
 		Clients:    []Client{},
 		NumMembers: 0,
 		InMsgs:     make(chan Message, 10),
