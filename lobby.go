@@ -35,15 +35,15 @@ type Message struct {
 }
 
 type Lobby struct {
-	ID           string       `json:"id"`
-	Name         string       `json:"name"`
-	Genre        string       `json:"genre"`
-	Public       bool         `json:"public"`
-	Admin        string       `json:"admin"`
-	CurrentTrack Track        `json:"currentTrack`
-	Clients      []Client     `json:"-"`
-	NumMembers   int          `json:"numMembers"`
-	InMsgs       chan Message `json:"-"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Genre        string            `json:"genre"`
+	Public       bool              `json:"public"`
+	Admin        string            `json:"admin"`
+	CurrentTrack Track             `json:"currentTrack`
+	Clients      map[string]Client `json:"-"`
+	NumMembers   int               `json:"numMembers"`
+	InMsgs       chan Message      `json:"-"`
 }
 
 func NewLobby(id, name, genre string, public bool, admin string) *Lobby {
@@ -53,7 +53,7 @@ func NewLobby(id, name, genre string, public bool, admin string) *Lobby {
 		Genre:      genre,
 		Public:     public,
 		Admin:      admin,
-		Clients:    []Client{},
+		Clients:    make(map[string]Client),
 		NumMembers: 0,
 		InMsgs:     make(chan Message, 10),
 	}
@@ -69,16 +69,46 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	client := NewClient(conn, username, l.InMsgs)
 	l.NumMembers++
 
-	go client.ReadIncomingMessages()
+	go func() {
+		err := client.ReadIncomingMessages()
+		log.Printf("User disconnected: %s", err)
+		l.disconnect(&client)
+	}()
 
-	l.Clients = append(l.Clients, client)
+	l.Clients[username] = client
+
+	// Make this user the admin if there is none.
+	if l.Admin == "" {
+		l.Admin = username
+	}
+
+	// Send the state of the lobby to the client.
+	l.sendState(&client)
+
 	return client
+}
+
+// Remove the client from the active lobby clients.
+func (l *Lobby) disconnect(client *Client) {
+	delete(l.Clients, client.Username)
+	l.NumMembers--
+
+	// Check if we need to promote someone to admin.
+	if client.Username == l.Admin {
+		// Go maps are randomly ordered, so this will select a random client.
+		for newAdmin := range l.Clients {
+			log.Printf("Promoting %s to admin", newAdmin)
+			l.Admin = newAdmin
+			break
+		}
+	}
 }
 
 func listenForClientMsgs(l *Lobby) {
 	for {
 		msg := <-l.InMsgs
 		log.Printf("Received message: %q from client %d", msg, msg.Username)
+		// TODO read the message, parse the command, and act accordingly.
 		// TODO currently this echoes the message back to the client that sent it.
 		// May want to change that in the future.
 		for _, c := range l.Clients {
@@ -92,6 +122,6 @@ func listenForClientMsgs(l *Lobby) {
 // Send the current state of the lobby to a client.
 func (l *Lobby) sendState(c *Client) {
 	state := Message{CurrentTrack: l.CurrentTrack}
-	log.Printf("Sending lobby state %q to %s", state, c.Username)
+	log.Printf("Sending lobby state to %s", state, c.Username)
 	c.Send(state)
 }

@@ -33,12 +33,11 @@ func (c *Client) Send(msg Message) error {
 // ReadIncomingMessages loops forever, reading incoming messages from this client's connection,
 // and puts them in the InMsg channel.
 // Should be called asynchronously.
-func (c *Client) ReadIncomingMessages() {
+func (c *Client) ReadIncomingMessages() error {
 	for {
 		msg := Message{}
 		if err := c.Conn.ReadJSON(&msg); err != nil {
-			log.Println(err)
-			return
+			return err
 		}
 		msg.Username = c.Username
 		c.InMsgs <- msg

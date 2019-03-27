@@ -88,9 +88,6 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	if lobby, ok := Lobbies[id]; ok {
 		client := lobby.join(conn, username)
 		log.Printf("%s has joined lobby %q", client.Username, lobby.ID)
-
-		// Send the state of the lobby to the client.
-		lobby.sendState(&client)
 	} else {
 		log.Printf("Lobby with ID %q does not exist", id)
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseUnsupportedData, "Lobby does not exist"))
