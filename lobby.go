@@ -6,6 +6,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type LobbyMode int
+
+// Go equivalent to enum.
+const (
+	ADMIN_CONTROLLED LobbyMode = iota
+	FREE_FOR_ALL
+	ROUND_ROBIN
+)
+
 type Track struct {
 	// Spotify URI for this track.
 	URI string `json:"uri,omitempty"`
@@ -37,6 +46,7 @@ type Message struct {
 type Lobby struct {
 	ID           string            `json:"id"`
 	Name         string            `json:"name"`
+	LobbyMode    LobbyMode         `json:"lobbyMode"`
 	Genre        string            `json:"genre"`
 	Public       bool              `json:"public"`
 	Admin        string            `json:"admin"`
@@ -46,10 +56,11 @@ type Lobby struct {
 	InMsgs       chan Message      `json:"-"`
 }
 
-func NewLobby(id, name, genre string, public bool, admin string) *Lobby {
+func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string) *Lobby {
 	lobby := Lobby{
 		ID:         id,
 		Name:       name,
+		LobbyMode:  lobbyMode,
 		Genre:      genre,
 		Public:     public,
 		Admin:      admin,
@@ -122,6 +133,6 @@ func listenForClientMsgs(l *Lobby) {
 // Send the current state of the lobby to a client.
 func (l *Lobby) sendState(c *Client) {
 	state := Message{CurrentTrack: l.CurrentTrack}
-	log.Printf("Sending lobby state to %s", state, c.Username)
+	log.Printf("Sending lobby state to %s", c.Username)
 	c.Send(state)
 }

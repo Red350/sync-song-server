@@ -26,7 +26,7 @@ func NewClient(conn *websocket.Conn, username string, inMsgs chan Message) Clien
 
 // Send sends a message to this client using their websocket.
 func (c *Client) Send(msg Message) error {
-	log.Printf("Sending message %q to %s", msg, c.Username)
+	log.Printf("Sending to %s: %#v", c.Username, msg)
 	return c.Conn.WriteJSON(msg)
 }
 
