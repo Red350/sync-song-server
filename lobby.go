@@ -15,34 +15,6 @@ const (
 	ROUND_ROBIN
 )
 
-type Track struct {
-	// Spotify URI for this track.
-	URI string `json:"uri,omitempty"`
-
-	// Name of the track.
-	Name string `json:"name,omitempty"`
-
-	// Name of the artist.
-	Artist string `json:"artist,omitempty"`
-
-	// Song position in millis.
-	Position int64 `json:"position,omitempty"`
-}
-
-type Message struct {
-	// Who the message originated from (empty string implies the server).
-	Username string `json:"username,omitempty"`
-
-	// Spotify URI of the current track in this lobby.
-	CurrentTrack Track `json:"currentTrack,omitempty"`
-
-	// Command for the user to perform e.g. play/pause.
-	Command string `json:"command,omitempty"`
-
-	// User messages.
-	UserMsg string `json:"userMsg,omitempty"`
-}
-
 type Lobby struct {
 	ID           string            `json:"id"`
 	Name         string            `json:"name"`
@@ -115,6 +87,7 @@ func (l *Lobby) disconnect(client *Client) {
 	}
 }
 
+// listenForClientMsgs listens to the lobby's InMsgs chan for any messages from clients.
 func listenForClientMsgs(l *Lobby) {
 	for {
 		msg := <-l.InMsgs
@@ -130,7 +103,7 @@ func listenForClientMsgs(l *Lobby) {
 	}
 }
 
-// Send the current state of the lobby to a client.
+// sendState sends the current state of the lobby to a client.
 func (l *Lobby) sendState(c *Client) {
 	state := Message{CurrentTrack: l.CurrentTrack}
 	log.Printf("Sending lobby state to %s", c.Username)

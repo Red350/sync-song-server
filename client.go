@@ -31,7 +31,7 @@ func (c *Client) Send(msg Message) error {
 }
 
 // ReadIncomingMessages loops forever, reading incoming messages from this client's connection,
-// and puts them in the InMsg channel.
+// and putting them in the InMsgs channel.
 // Should be called asynchronously.
 func (c *Client) ReadIncomingMessages() error {
 	for {
