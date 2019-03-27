@@ -71,7 +71,7 @@ func CreateLobby(w http.ResponseWriter, r *http.Request) {
 	Lobbies[id] = l
 	log.Printf("Lobby %q has been created with ID %q", name, id)
 
-	w.Write([]byte(fmt.Sprintf("Lobby created with ID %q", id)))
+	w.Write([]byte(fmt.Sprintf("%s", id)))
 }
 
 func JoinLobby(w http.ResponseWriter, r *http.Request) {
