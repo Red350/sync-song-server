@@ -8,7 +8,7 @@ type Message struct {
 	CurrentTrack Track `json:"currentTrack,omitempty"`
 
 	// Command for the user to perform e.g. play/pause.
-	Command string `json:"command,omitempty"`
+	Command Command `json:"command,omitempty"`
 
 	// User messages.
 	UserMsg string `json:"userMsg,omitempty"`

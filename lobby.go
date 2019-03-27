@@ -6,9 +6,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Go equivalent to enum.
 type LobbyMode int
 
-// Go equivalent to enum.
 const (
 	ADMIN_CONTROLLED LobbyMode = iota
 	FREE_FOR_ALL
@@ -23,6 +23,7 @@ type Lobby struct {
 	Public       bool              `json:"public"`
 	Admin        string            `json:"admin"`
 	CurrentTrack Track             `json:"currentTrack`
+	TrackQueue   TrackQueue        `json:"trackQueue"`
 	Clients      map[string]Client `json:"-"`
 	NumMembers   int               `json:"numMembers"`
 	InMsgs       chan Message      `json:"-"`
@@ -36,13 +37,14 @@ func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public 
 		Genre:      genre,
 		Public:     public,
 		Admin:      admin,
+		TrackQueue: TrackQueue{},
 		Clients:    make(map[string]Client),
 		NumMembers: 0,
 		InMsgs:     make(chan Message, 10),
 	}
 
-	// TODO this should be moved to where lobbies are created
-	go listenForClientMsgs(&lobby)
+	// TODO maybe this should be moved to where lobbies are created
+	go lobby.listenForClientMsgs()
 	return &lobby
 }
 
@@ -88,17 +90,48 @@ func (l *Lobby) disconnect(client *Client) {
 }
 
 // listenForClientMsgs listens to the lobby's InMsgs chan for any messages from clients.
-func listenForClientMsgs(l *Lobby) {
+func (l *Lobby) listenForClientMsgs() {
 	for {
-		msg := <-l.InMsgs
-		log.Printf("Received message: %q from client %d", msg, msg.Username)
-		// TODO read the message, parse the command, and act accordingly.
-		// TODO currently this echoes the message back to the client that sent it.
-		// May want to change that in the future.
-		for _, c := range l.Clients {
-			if err := c.Send(msg); err != nil {
-				log.Printf("Failed to send message %s to %s: %s", msg, c.Username, err)
+		inMsg := <-l.InMsgs
+		log.Printf("Received message: %q from client %d", inMsg, inMsg.Username)
+		outMsg := Message{Username: inMsg.Username}
+
+		// Attach a user message to the outgoing message if exists.
+		if inMsg.UserMsg != "" {
+			outMsg.UserMsg = inMsg.UserMsg
+		}
+
+		// Parse the command.
+		command := ClientCommand(inMsg.Command)
+		switch command {
+		case ADD_SONG:
+			switch l.LobbyMode {
+			case FREE_FOR_ALL:
+				l.addToQueue(inMsg.CurrentTrack)
+			case ADMIN_CONTROLLED:
+				// TODO return an error here if the user can't add a command.
+				if inMsg.Username == l.Admin {
+					l.addToQueue(inMsg.CurrentTrack)
+				}
 			}
+		case VOTE_SKIP:
+			// TODO this
+		}
+
+		// Send the response message.
+		l.sendToAll(outMsg)
+	}
+}
+
+func (l *Lobby) addToQueue(track Track) {
+	log.Printf("Adding track to queue: %#v", track)
+	l.TrackQueue.push(track)
+}
+
+func (l *Lobby) sendToAll(msg Message) {
+	for _, c := range l.Clients {
+		if err := c.Send(msg); err != nil {
+			log.Printf("Failed to send message %s to %s: %s", msg, c.Username, err)
 		}
 	}
 }
