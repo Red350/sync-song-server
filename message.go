@@ -4,7 +4,8 @@ type Message struct {
 	// Who the message originated from (empty string implies the server).
 	Username string `json:"username,omitempty"`
 
-	// Spotify URI of the current track in this lobby.
+	// Track being referenced by the rest of this message.
+	// TODO rename this to just Track.
 	CurrentTrack Track `json:"currentTrack,omitempty"`
 
 	// Command for the user to perform e.g. play/pause.

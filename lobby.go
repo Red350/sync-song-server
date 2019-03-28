@@ -10,7 +10,7 @@ import (
 type LobbyMode int
 
 const (
-	ADMIN_CONTROLLED LobbyMode = iota
+	ADMIN_CONTROLLED LobbyMode = iota + 1
 	FREE_FOR_ALL
 	ROUND_ROBIN
 )
@@ -107,10 +107,20 @@ func (l *Lobby) listenForClientMsgs() {
 		case ADD_SONG:
 			switch l.LobbyMode {
 			case FREE_FOR_ALL:
+				if l.CurrentTrack == (Track{}) {
+					l.CurrentTrack = inMsg.CurrentTrack
+					l.playCurrentTrack()
+					return
+				}
 				l.addToQueue(inMsg.CurrentTrack)
 			case ADMIN_CONTROLLED:
 				// TODO return an error here if the user can't add a command.
 				if inMsg.Username == l.Admin {
+					if l.CurrentTrack == (Track{}) {
+						l.CurrentTrack = inMsg.CurrentTrack
+						l.playCurrentTrack()
+						return
+					}
 					l.addToQueue(inMsg.CurrentTrack)
 				}
 			}
@@ -121,6 +131,15 @@ func (l *Lobby) listenForClientMsgs() {
 		// Send the response message.
 		l.sendToAll(outMsg)
 	}
+}
+
+// playCurrentTrack sends a command to all lobby members to play the current track.
+func (l *Lobby) playCurrentTrack() {
+	log.Printf("Playing %#v", l.CurrentTrack)
+	l.sendToAll(Message{
+		CurrentTrack: l.CurrentTrack,
+		Command:      Command(PLAY),
+	})
 }
 
 func (l *Lobby) addToQueue(track Track) {

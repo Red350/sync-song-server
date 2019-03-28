@@ -104,12 +104,6 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 func initialiseTestLobby() {
 	id := UniqueLobbyID()
 	l := NewLobby(id, "Test Lobby", FREE_FOR_ALL, "Whatev", true, "red350")
-	l.CurrentTrack = Track{
-		URI:      "spotify:track:5ZrrXIYTvjXPKVQMjqaumR",
-		Name:     "Something",
-		Artist:   "Else",
-		Position: 5555,
-	}
 	Lobbies[id] = l
 	log.Printf("Test lobby created. Remove this before deployment.")
 }
