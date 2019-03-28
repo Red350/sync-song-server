@@ -8,7 +8,7 @@ type Message struct {
 	// TODO rename this to just Track.
 	CurrentTrack *Track `json:"currentTrack,omitempty"`
 
-	TrackQueue []*Track `json:"queue,omitempty"`
+	TrackQueue []*Track `json:"trackQueue,omitempty"`
 
 	// Command for the user to perform e.g. play/pause.
 	Command Command `json:"command,omitempty"`
