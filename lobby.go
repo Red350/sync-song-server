@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/gorilla/websocket"
@@ -25,6 +26,7 @@ type Lobby struct {
 	CurrentTrack Track             `json:"currentTrack`
 	TrackQueue   TrackQueue        `json:"trackQueue"`
 	Clients      map[string]Client `json:"-"`
+	SkipVotes    map[string]bool   `json"-"`
 	NumMembers   int               `json:"numMembers"`
 	InMsgs       chan Message      `json:"-"`
 }
@@ -39,6 +41,7 @@ func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public 
 		Admin:      admin,
 		TrackQueue: TrackQueue{},
 		Clients:    make(map[string]Client),
+		SkipVotes:  make(map[string]bool),
 		NumMembers: 0,
 		InMsgs:     make(chan Message, 10),
 	}
@@ -78,6 +81,9 @@ func (l *Lobby) disconnect(client *Client) {
 	delete(l.Clients, client.Username)
 	l.NumMembers--
 
+	// Remove any outstanding votes for this client.
+	delete(l.SkipVotes, client.Username)
+
 	// Check if we need to promote someone to admin.
 	if client.Username == l.Admin {
 		// Go maps are randomly ordered, so this will select a random client.
@@ -89,7 +95,8 @@ func (l *Lobby) disconnect(client *Client) {
 	}
 }
 
-// listenForClientMsgs listens to the lobby's InMsgs chan for any messages from clients.
+// listenForClientMsgs listens to the lobby's InMsgs chan for any messages from clients
+// and performs actions based on their content.
 func (l *Lobby) listenForClientMsgs() {
 	for {
 		inMsg := <-l.InMsgs
@@ -101,7 +108,7 @@ func (l *Lobby) listenForClientMsgs() {
 			outMsg.UserMsg = inMsg.UserMsg
 		}
 
-		// Parse the command.
+		// Parse the command and perform any necessary actions.
 		command := ClientCommand(inMsg.Command)
 		switch command {
 		case ADD_SONG:
@@ -115,6 +122,7 @@ func (l *Lobby) listenForClientMsgs() {
 				l.addToQueue(inMsg.CurrentTrack)
 			case ADMIN_CONTROLLED:
 				// TODO return an error here if the user can't add a command.
+				// TODO populate the out message instead of calling playToAll and returning.
 				if inMsg.Username == l.Admin {
 					if l.CurrentTrack == (Track{}) {
 						l.CurrentTrack = inMsg.CurrentTrack
@@ -125,7 +133,16 @@ func (l *Lobby) listenForClientMsgs() {
 				}
 			}
 		case VOTE_SKIP:
-			// TODO this
+			// Vote to skip works the same in all lobby modes.
+			l.log(fmt.Sprintf("Skip vote received from %s", inMsg.Username))
+			l.SkipVotes[inMsg.Username] = true
+			if l.countVotes() {
+				// Skip to the next song
+				l.log("Skip vote passed")
+				nextTrack := l.TrackQueue.pop()
+				outMsg.CurrentTrack = nextTrack
+				outMsg.Command = Command(SKIP)
+			}
 		}
 
 		// Send the response message.
@@ -142,11 +159,18 @@ func (l *Lobby) playCurrentTrack() {
 	})
 }
 
+// addToQueue adds the provided track to the track queue.
 func (l *Lobby) addToQueue(track Track) {
 	log.Printf("Adding track to queue: %#v", track)
 	l.TrackQueue.push(track)
 }
 
+// Returns true if more than half the lobby members have voted to skip, otherwise false.
+func (l *Lobby) countVotes() bool {
+	return len(l.SkipVotes) > (l.NumMembers / 2)
+}
+
+// sendToAll sends the provided message to all this lobby's clients.
 func (l *Lobby) sendToAll(msg Message) {
 	for _, c := range l.Clients {
 		if err := c.Send(msg); err != nil {
@@ -160,4 +184,9 @@ func (l *Lobby) sendState(c *Client) {
 	state := Message{CurrentTrack: l.CurrentTrack}
 	log.Printf("Sending lobby state to %s", c.Username)
 	c.Send(state)
+}
+
+// log logs a message with the lobby ID prefixed.
+func (l *Lobby) log(msg string) {
+	log.Printf("%s: %s", l.ID, msg)
 }
