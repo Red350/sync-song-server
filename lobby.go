@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/gorilla/websocket"
 )
@@ -202,5 +203,5 @@ func (l *Lobby) sendState(c *Client) {
 
 // log logs a message with the lobby ID prefixed.
 func (l *Lobby) log(msg string) {
-	l.log(fmt.Sprintf("%s: %s", l.ID, msg))
+	log.Printf("%s: %s", l.ID, msg)
 }
