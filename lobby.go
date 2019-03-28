@@ -123,6 +123,8 @@ func (l *Lobby) listenForClientMsgs() {
 					continue
 				}
 				l.addToQueue(inMsg.CurrentTrack)
+				outMsg.Command = Command(QUEUE)
+				outMsg.TrackQueue = l.TrackQueue
 			case ADMIN_CONTROLLED:
 				// TODO return an error here if the user can't add a command.
 				// TODO populate the out message instead of calling playToAll and continuing.
@@ -133,6 +135,8 @@ func (l *Lobby) listenForClientMsgs() {
 						continue
 					}
 					l.addToQueue(inMsg.CurrentTrack)
+					outMsg.Command = Command(QUEUE)
+					outMsg.TrackQueue = l.TrackQueue
 				}
 			}
 		case VOTE_SKIP:
@@ -188,7 +192,11 @@ func (l *Lobby) sendToAll(msg Message) {
 
 // sendState sends the current state of the lobby to a client.
 func (l *Lobby) sendState(c *Client) {
-	state := Message{CurrentTrack: l.CurrentTrack}
+	state := Message{}
+	if l.CurrentTrack != (Track{}) {
+		state.CurrentTrack = l.CurrentTrack
+		state.Command = Command(PLAY)
+	}
 	log.Printf("Sending lobby state to %s", c.Username)
 	c.Send(state)
 }
