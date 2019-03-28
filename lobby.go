@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/gorilla/websocket"
 )
@@ -59,7 +58,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 
 	go func() {
 		err := client.ReadIncomingMessages()
-		log.Printf("User disconnected: %s", err)
+		l.log(fmt.Sprintf("User disconnected: %s", err))
 		l.disconnect(&client)
 	}()
 
@@ -88,7 +87,7 @@ func (l *Lobby) disconnect(client *Client) {
 	if client.Username == l.Admin {
 		// Go maps are randomly ordered, so this will select a random client.
 		for newAdmin := range l.Clients {
-			log.Printf("Promoting %s to admin", newAdmin)
+			l.log(fmt.Sprintf("Promoting %s to admin", newAdmin))
 			l.Admin = newAdmin
 			break
 		}
@@ -103,7 +102,7 @@ func (l *Lobby) listenForClientMsgs() {
 		inMsg := <-l.InMsgs
 		// TODO could do all this inside of a goroutine, otherwise a single thread is dealing with all user requests.
 		// Though maybe its better not to, to avoid race conditions.
-		log.Printf("Received message from %s: %#v", inMsg.Username, inMsg)
+		l.log(fmt.Sprintf("Received message from %s: %#v", inMsg.Username, inMsg))
 		outMsg := Message{Username: inMsg.Username}
 
 		// Attach a user message to the outgoing message if exists.
@@ -163,7 +162,7 @@ func (l *Lobby) listenForClientMsgs() {
 
 // playCurrentTrack sends a command to all lobby members to play the current track.
 func (l *Lobby) playCurrentTrack() {
-	log.Printf("Playing %#v", l.CurrentTrack)
+	l.log(fmt.Sprintf("Playing %#v", l.CurrentTrack))
 	l.sendToAll(Message{
 		CurrentTrack: l.CurrentTrack,
 		Command:      Command(PLAY),
@@ -172,7 +171,7 @@ func (l *Lobby) playCurrentTrack() {
 
 // addToQueue adds the provided track to the track queue.
 func (l *Lobby) addToQueue(track *Track) {
-	log.Printf("Adding track to queue: %#v", track)
+	l.log(fmt.Sprintf("Adding track to queue: %#v", track))
 	l.TrackQueue.push(track)
 }
 
@@ -185,7 +184,7 @@ func (l *Lobby) countVotes() bool {
 func (l *Lobby) sendToAll(msg Message) {
 	for _, c := range l.Clients {
 		if err := c.Send(msg); err != nil {
-			log.Printf("Failed to send message %s to %s: %s", msg, c.Username, err)
+			l.log(fmt.Sprintf("Failed to send message %s to %s: %s", msg, c.Username, err))
 		}
 	}
 }
@@ -197,11 +196,11 @@ func (l *Lobby) sendState(c *Client) {
 		state.CurrentTrack = l.CurrentTrack
 		state.Command = Command(PLAY)
 	}
-	log.Printf("Sending lobby state to %s", c.Username)
+	l.log(fmt.Sprintf("Sending lobby state to %s", c.Username))
 	c.Send(state)
 }
 
 // log logs a message with the lobby ID prefixed.
 func (l *Lobby) log(msg string) {
-	log.Printf("%s: %s", l.ID, msg)
+	l.log(fmt.Sprintf("%s: %s", l.ID, msg))
 }
