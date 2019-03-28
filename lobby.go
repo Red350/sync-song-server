@@ -23,7 +23,7 @@ type Lobby struct {
 	Genre        string            `json:"genre"`
 	Public       bool              `json:"public"`
 	Admin        string            `json:"admin"`
-	CurrentTrack Track             `json:"currentTrack`
+	CurrentTrack *Track            `json:"currentTrack`
 	TrackQueue   TrackQueue        `json:"trackQueue"`
 	Clients      map[string]Client `json:"-"`
 	SkipVotes    map[string]bool   `json"-"`
@@ -117,7 +117,7 @@ func (l *Lobby) listenForClientMsgs() {
 		case ADD_SONG:
 			switch l.LobbyMode {
 			case FREE_FOR_ALL:
-				if l.CurrentTrack == (Track{}) {
+				if l.CurrentTrack == nil {
 					l.CurrentTrack = inMsg.CurrentTrack
 					l.playCurrentTrack()
 					continue
@@ -129,7 +129,7 @@ func (l *Lobby) listenForClientMsgs() {
 				// TODO return an error here if the user can't add a command.
 				// TODO populate the out message instead of calling playToAll and continuing.
 				if inMsg.Username == l.Admin {
-					if l.CurrentTrack == (Track{}) {
+					if l.CurrentTrack == nil {
 						l.CurrentTrack = inMsg.CurrentTrack
 						l.playCurrentTrack()
 						continue
@@ -171,7 +171,7 @@ func (l *Lobby) playCurrentTrack() {
 }
 
 // addToQueue adds the provided track to the track queue.
-func (l *Lobby) addToQueue(track Track) {
+func (l *Lobby) addToQueue(track *Track) {
 	log.Printf("Adding track to queue: %#v", track)
 	l.TrackQueue.push(track)
 }
@@ -193,7 +193,7 @@ func (l *Lobby) sendToAll(msg Message) {
 // sendState sends the current state of the lobby to a client.
 func (l *Lobby) sendState(c *Client) {
 	state := Message{}
-	if l.CurrentTrack != (Track{}) {
+	if l.CurrentTrack != nil {
 		state.CurrentTrack = l.CurrentTrack
 		state.Command = Command(PLAY)
 	}

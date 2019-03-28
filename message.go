@@ -6,9 +6,9 @@ type Message struct {
 
 	// Track being referenced by the rest of this message.
 	// TODO rename this to just Track.
-	CurrentTrack Track `json:"currentTrack,omitempty"`
+	CurrentTrack *Track `json:"currentTrack,omitempty"`
 
-	TrackQueue []Track `json:"queue,omitempty"`
+	TrackQueue []*Track `json:"queue,omitempty"`
 
 	// Command for the user to perform e.g. play/pause.
 	Command Command `json:"command,omitempty"`
