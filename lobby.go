@@ -59,7 +59,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 
 	go func() {
 		err := client.ReadIncomingMessages()
-		l.log(fmt.Sprintf("User disconnected: %s", err))
+		l.log(fmt.Sprintf("%s disconnected: %s", client.Username, err))
 		l.disconnect(&client)
 	}()
 
@@ -150,11 +150,18 @@ func (l *Lobby) listenForClientMsgs() {
 					// TODO return an error instead of continuing once errors have been added to the message struct.
 					continue
 				}
+				// Clear the votes.
+				l.SkipVotes = make(map[string]bool)
+
+				// Return the next song in the queue.
 				nextTrack := l.TrackQueue.pop()
 				outMsg.CurrentTrack = nextTrack
 				outMsg.Command = Command(SKIP)
 			}
 		}
+
+		// No harm in always sending the current track queue.
+		outMsg.TrackQueue = l.TrackQueue
 
 		// Send the response message.
 		l.sendToAll(outMsg)
@@ -193,10 +200,10 @@ func (l *Lobby) sendToAll(msg Message) {
 // sendState sends the current state of the lobby to a client.
 func (l *Lobby) sendState(c *Client) {
 	state := Message{}
-	if l.CurrentTrack != nil {
-		state.CurrentTrack = l.CurrentTrack
-		state.Command = Command(PLAY)
-	}
+	state.CurrentTrack = l.CurrentTrack
+	state.TrackQueue = l.TrackQueue
+	// TODO maybe introduce a state command?
+	state.Command = Command(PLAY)
 	l.log(fmt.Sprintf("Sending lobby state to %s", c.Username))
 	c.Send(state)
 }

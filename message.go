@@ -29,4 +29,7 @@ type Track struct {
 
 	// Song position in millis.
 	Position int64 `json:"position,omitempty"`
+
+	// User who chose this song.
+	Username string `json:"username,omitempty"`
 }

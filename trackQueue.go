@@ -1,12 +1,9 @@
 package main
 
-import "log"
-
 type TrackQueue []*Track
 
 func (q *TrackQueue) push(t *Track) {
 	*q = append(*q, t)
-	log.Printf("Queue after push %#v", *q)
 }
 
 func (q *TrackQueue) pop() *Track {
