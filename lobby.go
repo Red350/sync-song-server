@@ -99,8 +99,11 @@ func (l *Lobby) disconnect(client *Client) {
 // and performs actions based on their content.
 func (l *Lobby) listenForClientMsgs() {
 	for {
+		l.log("Waiting for client message")
 		inMsg := <-l.InMsgs
-		log.Printf("Received message: %q from client %d", inMsg, inMsg.Username)
+		// TODO could do all this inside of a goroutine, otherwise a single thread is dealing with all user requests.
+		// Though maybe its better not to, to avoid race conditions.
+		log.Printf("Received message: %#v from client %s", inMsg, inMsg.Username)
 		outMsg := Message{Username: inMsg.Username}
 
 		// Attach a user message to the outgoing message if exists.
@@ -117,17 +120,17 @@ func (l *Lobby) listenForClientMsgs() {
 				if l.CurrentTrack == (Track{}) {
 					l.CurrentTrack = inMsg.CurrentTrack
 					l.playCurrentTrack()
-					return
+					continue
 				}
 				l.addToQueue(inMsg.CurrentTrack)
 			case ADMIN_CONTROLLED:
 				// TODO return an error here if the user can't add a command.
-				// TODO populate the out message instead of calling playToAll and returning.
+				// TODO populate the out message instead of calling playToAll and continuing.
 				if inMsg.Username == l.Admin {
 					if l.CurrentTrack == (Track{}) {
 						l.CurrentTrack = inMsg.CurrentTrack
 						l.playCurrentTrack()
-						return
+						continue
 					}
 					l.addToQueue(inMsg.CurrentTrack)
 				}
@@ -139,6 +142,10 @@ func (l *Lobby) listenForClientMsgs() {
 			if l.countVotes() {
 				// Skip to the next song
 				l.log("Skip vote passed")
+				if l.TrackQueue.isEmpty() {
+					// TODO return an error instead of continuing once errors have been added to the message struct.
+					continue
+				}
 				nextTrack := l.TrackQueue.pop()
 				outMsg.CurrentTrack = nextTrack
 				outMsg.Command = Command(SKIP)
