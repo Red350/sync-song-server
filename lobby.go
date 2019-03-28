@@ -23,7 +23,7 @@ type Lobby struct {
 	Genre        string            `json:"genre"`
 	Public       bool              `json:"public"`
 	Admin        string            `json:"admin"`
-	CurrentTrack *Track            `json:"currentTrack`
+	CurrentTrack *Track            `json:"currentTrack"`
 	TrackQueue   TrackQueue        `json:"trackQueue"`
 	Clients      map[string]Client `json:"-"`
 	SkipVotes    map[string]bool   `json"-"`
@@ -103,7 +103,7 @@ func (l *Lobby) listenForClientMsgs() {
 		inMsg := <-l.InMsgs
 		// TODO could do all this inside of a goroutine, otherwise a single thread is dealing with all user requests.
 		// Though maybe its better not to, to avoid race conditions.
-		log.Printf("Received message: %#v from client %s", inMsg, inMsg.Username)
+		log.Printf("Received message from %s: %#v", inMsg.Username, inMsg)
 		outMsg := Message{Username: inMsg.Username}
 
 		// Attach a user message to the outgoing message if exists.
