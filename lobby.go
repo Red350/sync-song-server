@@ -17,18 +17,18 @@ const (
 )
 
 type Lobby struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	LobbyMode    LobbyMode         `json:"lobbyMode"`
-	Genre        string            `json:"genre"`
-	Public       bool              `json:"public"`
-	Admin        string            `json:"admin"`
-	CurrentTrack *Track            `json:"currentTrack"`
-	TrackQueue   TrackQueue        `json:"trackQueue"`
-	Clients      map[string]Client `json:"-"`
-	SkipVotes    map[string]bool   `json"-"`
-	NumMembers   int               `json:"numMembers"`
-	InMsgs       chan Message      `json:"-"`
+	ID           string             `json:"id"`
+	Name         string             `json:"name"`
+	LobbyMode    LobbyMode          `json:"lobbyMode"`
+	Genre        string             `json:"genre"`
+	Public       bool               `json:"public"`
+	Admin        string             `json:"admin"`
+	CurrentTrack *Track             `json:"currentTrack"`
+	TrackQueue   TrackQueue         `json:"trackQueue"`
+	Clients      map[string]*Client `json:"-"`
+	SkipVotes    map[string]bool    `json"-"`
+	NumMembers   int                `json:"numMembers"`
+	InMsgs       chan Message       `json:"-"`
 }
 
 func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string) *Lobby {
@@ -40,7 +40,7 @@ func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public 
 		Public:     public,
 		Admin:      admin,
 		TrackQueue: TrackQueue{},
-		Clients:    make(map[string]Client),
+		Clients:    make(map[string]*Client),
 		SkipVotes:  make(map[string]bool),
 		NumMembers: 0,
 		InMsgs:     make(chan Message, 10),
@@ -63,7 +63,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 		l.disconnect(&client)
 	}()
 
-	l.Clients[username] = client
+	l.Clients[username] = &client
 
 	// Make this user the admin if there is none.
 	if l.Admin == "" {
@@ -117,55 +117,62 @@ func (l *Lobby) listenForClientMsgs() {
 		case ADD_SONG:
 			switch l.LobbyMode {
 			case FREE_FOR_ALL:
-				if l.CurrentTrack == nil {
-					l.CurrentTrack = inMsg.CurrentTrack
-					l.playCurrentTrack()
-					continue
-				}
-				l.addToQueue(inMsg.CurrentTrack)
-				outMsg.Command = Command(QUEUE)
-				outMsg.TrackQueue = l.TrackQueue
+				l.queueOrPlay(&outMsg, inMsg.CurrentTrack)
 			case ADMIN_CONTROLLED:
-				// TODO return an error here if the user can't add a command.
-				// TODO populate the out message instead of calling playToAll and continuing.
+				// TODO return an error here if the user isn't an admin.
 				if inMsg.Username == l.Admin {
-					if l.CurrentTrack == nil {
-						l.CurrentTrack = inMsg.CurrentTrack
-						l.playCurrentTrack()
-						continue
-					}
-					l.addToQueue(inMsg.CurrentTrack)
-					outMsg.Command = Command(QUEUE)
-					outMsg.TrackQueue = l.TrackQueue
+					l.queueOrPlay(&outMsg, inMsg.CurrentTrack)
 				}
 			}
 		case VOTE_SKIP:
 			// Vote to skip works the same in all lobby modes.
 			l.log(fmt.Sprintf("Skip vote received from %s", inMsg.Username))
+			if _, ok := l.SkipVotes[inMsg.Username]; !ok {
+				// Inform all users of the vote.
+				l.sendServerMessage(fmt.Sprintf("%s voted to skip.", inMsg.Username))
+			}
 			l.SkipVotes[inMsg.Username] = true
 			if l.countVotes() {
 				// Skip to the next song
 				l.log("Skip vote passed")
+				// Inform all users that the vote passed.
+				l.sendServerMessage("Skip vote passed.")
 				if l.TrackQueue.isEmpty() {
-					// TODO return an error instead of continuing once errors have been added to the message struct.
-					continue
+					// Clear the current song so that any songs added after will auto play.
+					l.CurrentTrack = nil
+					// TODO return error instead of continuing once errors have been added to the message struct.
+				} else {
+					// Return the next song in the queue.
+					nextTrack := l.TrackQueue.pop()
+					//l.GetPlayMessage(nextTrack)
+					l.setPlayMessage(&outMsg, nextTrack)
 				}
-				// Clear the votes.
-				l.SkipVotes = make(map[string]bool)
-
-				// Return the next song in the queue.
-				nextTrack := l.TrackQueue.pop()
-				outMsg.CurrentTrack = nextTrack
-				outMsg.Command = Command(SKIP)
 			}
 		}
 
-		// No harm in always sending the current track queue.
+		// No harm in always sending the current track queue to ensure clients stay in sync with it.
 		outMsg.TrackQueue = l.TrackQueue
 
 		// Send the response message.
 		l.sendToAll(outMsg)
 	}
+}
+
+// sendServerMessage asynchronously sends a server message to all users.
+func (l *Lobby) sendServerMessage(msg string) {
+	go l.sendToAll(Message{UserMsg: msg})
+}
+
+// setPlayMessage adds the track and PLAY command to the message struct.
+// It also clears any outstanding skip votes.
+func (l *Lobby) setPlayMessage(msg *Message, track *Track) {
+	msg.CurrentTrack = track
+	msg.Command = Command(PLAY)
+
+	// Update lobby state.
+	l.CurrentTrack = track
+	// Clear any outstanding votes to skip the previous song.
+	l.SkipVotes = make(map[string]bool)
 }
 
 // playCurrentTrack sends a command to all lobby members to play the current track.
@@ -175,6 +182,19 @@ func (l *Lobby) playCurrentTrack() {
 		CurrentTrack: l.CurrentTrack,
 		Command:      Command(PLAY),
 	})
+}
+
+// queueOrPlay queues the track if another track is already playing, otherwise
+// plays it immediately.
+func (l *Lobby) queueOrPlay(msg *Message, track *Track) {
+	if l.CurrentTrack == nil {
+		l.setPlayMessage(msg, track)
+	} else {
+		l.addToQueue(track)
+		msg.Command = Command(QUEUE)
+		// This is redundant as the queue is currently always added, but that may be changed in future.
+		msg.TrackQueue = l.TrackQueue
+	}
 }
 
 // addToQueue adds the provided track to the track queue.
@@ -192,7 +212,7 @@ func (l *Lobby) countVotes() bool {
 func (l *Lobby) sendToAll(msg Message) {
 	for _, c := range l.Clients {
 		if err := c.Send(msg); err != nil {
-			l.log(fmt.Sprintf("Failed to send message %s to %s: %s", msg, c.Username, err))
+			l.log(fmt.Sprintf("Failed to send message %#v to %s: %s", msg, c.Username, err))
 		}
 	}
 }
@@ -200,10 +220,12 @@ func (l *Lobby) sendToAll(msg Message) {
 // sendState sends the current state of the lobby to a client.
 func (l *Lobby) sendState(c *Client) {
 	state := Message{}
-	state.CurrentTrack = l.CurrentTrack
+	if l.CurrentTrack != nil {
+		state.CurrentTrack = l.CurrentTrack
+		state.Command = Command(PLAY)
+	}
 	state.TrackQueue = l.TrackQueue
 	// TODO maybe introduce a state command?
-	state.Command = Command(PLAY)
 	l.log(fmt.Sprintf("Sending lobby state to %s", c.Username))
 	c.Send(state)
 }

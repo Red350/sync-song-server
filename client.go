@@ -2,16 +2,18 @@ package main
 
 import (
 	"log"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
 // Client represents a single user who is connected to the server.
 type Client struct {
-	Conn     *websocket.Conn
-	Username string
-	InMsgs   chan Message
-	OutMsgs  chan string
+	Conn      *websocket.Conn
+	Username  string
+	InMsgs    chan Message
+	OutMsgs   chan string
+	sendMutex sync.Mutex
 }
 
 // NewClient is a convenience method for initialising a Client.
@@ -26,6 +28,8 @@ func NewClient(conn *websocket.Conn, username string, inMsgs chan Message) Clien
 
 // Send sends a message to this client using their websocket.
 func (c *Client) Send(msg Message) error {
+	c.sendMutex.Lock()
+	defer c.sendMutex.Unlock()
 	log.Printf("Sending to %s: %#v", c.Username, msg)
 	return c.Conn.WriteJSON(msg)
 }
