@@ -63,6 +63,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	go func() {
 		err := client.ReadIncomingMessages()
 		l.log(fmt.Sprintf("%s disconnected: %s", client.Username, err))
+		l.sendServerMessage(fmt.Sprintf("%s disconnected.", client.Username))
 		l.disconnect(&client)
 	}()
 
@@ -86,7 +87,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	return client
 }
 
-// Remove the client from the active lobby clients.
+// Remove the client from the active lobby clients and update state for other clients.
 func (l *Lobby) disconnect(client *Client) {
 	delete(l.Clients, client.Username)
 	// Find and delete the users name from ClientNames.
@@ -115,6 +116,8 @@ func (l *Lobby) disconnect(client *Client) {
 			}
 		}
 	}
+
+	l.sendStateToAll()
 }
 
 // listenForClientMsgs listens to the lobby's InMsgs chan for any messages from clients
