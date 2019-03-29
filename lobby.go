@@ -69,6 +69,9 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	l.Clients[username] = &client
 	l.ClientNames = append(l.ClientNames, username)
 
+	// Inform clients that a new user has joined and update their state.
+	l.sendServerMessage(fmt.Sprintf("%s has joined the lobby.", username))
+
 	// Make this user the admin if there is none.
 	if l.Admin == "" {
 		l.promoteToAdmin(username)
@@ -77,8 +80,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	// Send the initial state of the lobby to the client.
 	l.sendInitialState(&client)
 
-	// Inform clients that a new user has joined and update their state.
-	l.sendServerMessage(fmt.Sprintf("%s has joined the lobby.", username))
+	// Update all client's state.
 	l.sendStateToAll()
 
 	return client
