@@ -26,9 +26,12 @@ type Lobby struct {
 	CurrentTrack *Track             `json:"currentTrack"`
 	TrackQueue   TrackQueue         `json:"trackQueue"`
 	Clients      map[string]*Client `json:"-"`
-	SkipVotes    map[string]bool    `json"-"`
-	NumMembers   int                `json:"numMembers"`
-	InMsgs       chan Message       `json:"-"`
+	// Go does not have a way to get the keys of a map without looping over it,
+	// so storing them separately is a more performant way to keep track of them.
+	ClientNames []string
+	SkipVotes   map[string]bool `json"-"`
+	NumMembers  int             `json:"numMembers"`
+	InMsgs      chan Message    `json:"-"`
 }
 
 func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string) *Lobby {
@@ -64,14 +67,19 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	}()
 
 	l.Clients[username] = &client
+	l.ClientNames = append(l.ClientNames, username)
 
 	// Make this user the admin if there is none.
 	if l.Admin == "" {
-		l.Admin = username
+		l.promoteToAdmin(username)
 	}
 
-	// Send the state of the lobby to the client.
-	l.sendState(&client)
+	// Send the initial state of the lobby to the client.
+	l.sendInitialState(&client)
+
+	// Inform clients that a new user has joined and update their state.
+	l.sendServerMessage(fmt.Sprintf("%s has joined the lobby.", username))
+	l.sendStateToAll()
 
 	return client
 }
@@ -79,6 +87,13 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 // Remove the client from the active lobby clients.
 func (l *Lobby) disconnect(client *Client) {
 	delete(l.Clients, client.Username)
+	// Find and delete the users name from ClientNames.
+	for i, name := range l.ClientNames {
+		if name == client.Username {
+			l.ClientNames = append(l.ClientNames[:i], l.ClientNames[i+1:]...)
+			break
+		}
+	}
 	l.NumMembers--
 
 	// Remove any outstanding votes for this client.
@@ -86,11 +101,16 @@ func (l *Lobby) disconnect(client *Client) {
 
 	// Check if we need to promote someone to admin.
 	if client.Username == l.Admin {
-		// Go maps are randomly ordered, so this will select a random client.
-		for newAdmin := range l.Clients {
-			l.log(fmt.Sprintf("Promoting %s to admin", newAdmin))
-			l.Admin = newAdmin
-			break
+		// No clients left in the lobby, clear the admin spot.
+		if len(l.Clients) == 0 {
+			l.log("Lobby empty, clearing admin spot")
+			l.Admin = ""
+		} else {
+			// Go maps are randomly ordered, so this will select a random client.
+			for newAdmin := range l.Clients {
+				l.promoteToAdmin(newAdmin)
+				break
+			}
 		}
 	}
 }
@@ -148,10 +168,14 @@ func (l *Lobby) listenForClientMsgs() {
 					l.setPlayMessage(&outMsg, nextTrack)
 				}
 			}
+		case PROMOTE:
+			if inMsg.Username == l.Admin {
+				l.promoteToAdmin(inMsg.Admin)
+			}
 		}
 
-		// No harm in always sending the current track queue to ensure clients stay in sync with it.
-		outMsg.TrackQueue = l.TrackQueue
+		// No harm in always sending the current lobby state to ensure clients stay in sync with it.
+		l.setStateMessage(&outMsg)
 
 		// Send the response message.
 		l.sendToAll(outMsg)
@@ -160,7 +184,23 @@ func (l *Lobby) listenForClientMsgs() {
 
 // sendServerMessage asynchronously sends a server message to all users.
 func (l *Lobby) sendServerMessage(msg string) {
-	go l.sendToAll(Message{UserMsg: msg})
+	l.sendToAll(Message{UserMsg: msg})
+}
+
+func (l *Lobby) promoteToAdmin(newAdmin string) {
+	// Check that the the user being promoted is actually a lobby member.
+	if _, ok := l.Clients[newAdmin]; !ok {
+		l.log(fmt.Sprintf("Failed to promote %s to admin, not a lobby member"))
+		return
+	}
+
+	l.Admin = newAdmin
+	promoteStr := fmt.Sprintf("%s promoted to admin", newAdmin)
+	promoteMsg := Message{UserMsg: promoteStr}
+	l.setStateMessage(&promoteMsg)
+
+	l.log(promoteStr)
+	l.sendToAll(promoteMsg)
 }
 
 // setPlayMessage adds the track and PLAY command to the message struct.
@@ -208,26 +248,41 @@ func (l *Lobby) countVotes() bool {
 	return len(l.SkipVotes) > (l.NumMembers / 2)
 }
 
-// sendToAll sends the provided message to all this lobby's clients.
+// sendToAll asynchronously sends the provided message to all this lobby's clients.
 func (l *Lobby) sendToAll(msg Message) {
-	for _, c := range l.Clients {
-		if err := c.Send(msg); err != nil {
-			l.log(fmt.Sprintf("Failed to send message %#v to %s: %s", msg, c.Username, err))
+	go func() {
+		for _, c := range l.Clients {
+			if err := c.Send(msg); err != nil {
+				l.log(fmt.Sprintf("Failed to send message %#v to %s: %s", msg, c.Username, err))
+			}
 		}
-	}
+	}()
+}
+
+// setStateMessage loads the lobby state into the provided message.
+func (l *Lobby) setStateMessage(msg *Message) {
+	msg.CurrentTrack = l.CurrentTrack
+	msg.TrackQueue = l.TrackQueue
+	msg.Admin = l.Admin
+	msg.ClientNames = l.ClientNames
 }
 
 // sendState sends the current state of the lobby to a client.
-func (l *Lobby) sendState(c *Client) {
-	state := Message{}
-	if l.CurrentTrack != nil {
-		state.CurrentTrack = l.CurrentTrack
-		state.Command = Command(PLAY)
-	}
-	state.TrackQueue = l.TrackQueue
+func (l *Lobby) sendStateToAll() {
+	stateMsg := Message{}
+	l.setStateMessage(&stateMsg)
+	l.sendToAll(stateMsg)
+}
+
+func (l *Lobby) sendInitialState(c *Client) {
 	// TODO maybe introduce a state command?
+	stateMsg := Message{}
+	l.setStateMessage(&stateMsg)
+	if l.CurrentTrack != nil {
+		stateMsg.Command = Command(PLAY)
+	}
 	l.log(fmt.Sprintf("Sending lobby state to %s", c.Username))
-	c.Send(state)
+	c.Send(stateMsg)
 }
 
 // log logs a message with the lobby ID prefixed.

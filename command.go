@@ -7,6 +7,7 @@ type ClientCommand Command
 const (
 	ADD_SONG ClientCommand = iota + 1
 	VOTE_SKIP
+	PROMOTE
 )
 
 type ServerCommand Command

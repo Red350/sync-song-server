@@ -8,7 +8,14 @@ type Message struct {
 	// TODO rename this to just Track.
 	CurrentTrack *Track `json:"currentTrack,omitempty"`
 
+	// Tracks in the queue.
 	TrackQueue []*Track `json:"trackQueue,omitempty"`
+
+	// Clients connected to the lobby.
+	ClientNames []string `json:"clientNames,omitempty"`
+
+	// Current lobby admin.
+	Admin string `json:"admin,omitempty"`
 
 	// Command for the user to perform e.g. play/pause.
 	Command Command `json:"command,omitempty"`
