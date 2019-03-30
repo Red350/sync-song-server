@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -102,139 +101,32 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func dbConn() (*sql.DB, error) {
-	db, err := sql.Open("mysql", "root:@/syncsong")
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %s", err)
-	}
-	return db, nil
-}
-
-func insertLobby(lobby *Lobby) error {
-	db, err := dbConn()
-	if err != nil {
-		return fmt.Errorf("failed to get database connection: %s", err)
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %s", err)
-	}
-	var public int
-	if lobby.Public {
-		public = 1
-	}
-	stmt, err := tx.Prepare(`
-        insert into Lobby(id, name, mode, genre, public, currentUri)
-        values(?, ?, ?, ?, ?, '');`)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to prepare statement: %s", err)
-	}
-	if _, err := stmt.Exec(lobby.ID, lobby.Name, lobby.LobbyMode, lobby.Genre, public); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to execute statement: %s", err)
-	}
-
-	return tx.Commit()
-}
-
-func persistTracks(lobby *Lobby) error {
-	db, err := dbConn()
-	if err != nil {
-		return fmt.Errorf("failed to get database connection: %s", err)
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %s", err)
-	}
-	var public int
-	if lobby.Public {
-		public = 1
-	}
-	stmt, err := tx.Prepare(`
-        insert into Lobby(id, name, mode, genre, public, currentUri)
-        values(?, ?, ?, ?, ?, '');`)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to prepare statement: %s", err)
-	}
-	if _, err := stmt.Exec(lobby.ID, lobby.Name, lobby.LobbyMode, lobby.Genre, public); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to execute statement: %s", err)
-	}
-
-	return tx.Commit()
-}
-
-func loadFromDB() {
-	db, err := dbConn()
-	if err != nil {
-		log.Printf("Failed to restore lobby state: %s", err)
-	}
-
-	lobbies, err := db.Query("select id, name, mode, genre, public, currentUri from Lobby")
-	if err != nil {
-		panic(fmt.Sprintf("Error querying lobbies %s", err))
-	}
-
-	for lobbies.Next() {
-		var id string
-		var name string
-		var mode int
-		var genre string
-		var public bool
-		var uri sql.NullString
-		var artist string
-
-		if err := lobbies.Scan(&id, &name, &mode, &genre, &public, &uri); err != nil {
-			panic(fmt.Sprintf("Error parsing lobby: %s", err))
-		}
-		lobby := NewLobby(id, name, LobbyMode(mode), genre, public, "")
-
-		// Add the current track if there was one.
-		if uri.Valid {
-			err := db.QueryRow("select uri, name, artist from Track where uri=?", uri).Scan(&uri, &name, &artist)
-			if err != nil && err != sql.ErrNoRows {
-				panic(fmt.Sprintf("Error querying track: %s", err))
-			}
-			lobby.CurrentTrack = &Track{URI: uri.String, Name: name, Artist: artist}
-		}
-
-		// Add the queue.
-		queue, err := db.Query(
-			`select trackURI, name, artist from Queue
-            join Track on(Track.uri = Queue.trackURI)
-            where lobbyID=?
-            order by rank asc`, id)
-		if err != nil {
-			panic(fmt.Sprintf("Error querying queue: %s", err))
-		}
-
-		for queue.Next() {
-			if err := queue.Scan(&uri, &name, &artist); err != nil {
-				panic(fmt.Sprintf("Error parsing queue: %s", err))
-			}
-
-			lobby.TrackQueue.Push(&Track{URI: uri.String, Name: name, Artist: artist})
-		}
-
-		Lobbies[id] = lobby
-	}
-}
-
 // This is here for convenience during developement.
 func initialiseTestLobby() {
-	id := UniqueLobbyID()
-	l := NewLobby(id, "Test Lobby", FREE_FOR_ALL, "Whatev", true, "red350")
-	Lobbies[id] = l
-	insertLobby(l)
+	l := NewLobby("SQRT", "Test Lobby", FREE_FOR_ALL, "Whatev", true, "red350")
+	//Lobbies[id] = l
+	if err := insertLobby(l); err != nil {
+		log.Printf("Failed to insert lobby: %s", err)
+	}
 	log.Printf("Test lobby created. Remove this before deployment.")
 }
 
 func main() {
 	log.Printf("Starting server")
 	initialiseTestLobby()
-	loadFromDB()
+	if err := loadFromDB(&Lobbies); err != nil {
+		log.Printf("Failed to load lobbies from db: %s", err)
+	}
+
+	Lobbies["SQRT"].CurrentTrack = &Track{URI: "new", Name: "new", Artist: "new"}
+	Lobbies["SQRT"].TrackQueue.Push(&Track{URI: "queue", Name: "queue", Artist: "queue"})
+	Lobbies["SQRT"].TrackQueue.Push(&Track{URI: "queue2", Name: "queue", Artist: "queue"})
+
+	if err := persistTracks(Lobbies["SQRT"]); err != nil {
+		log.Printf("Failed to persist tracks: %s", err)
+	}
+
+	log.Printf("")
 	for k, v := range Lobbies {
 		log.Printf("%s: %s %#v\n", k, v.Name, v.CurrentTrack)
 		for _, track := range v.TrackQueue {
