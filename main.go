@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -100,6 +102,70 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func dbConn() (*sql.DB, error) {
+	db, err := sql.Open("mysql", "root:@/syncsong")
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %s", err)
+	}
+	return db, nil
+}
+
+func loadFromDB() {
+	db, err := dbConn()
+	if err != nil {
+		log.Printf("Failed to restore lobby state: %s", err)
+	}
+
+	lobbies, err := db.Query("select id, name, mode, genre, public, currentUri from Lobby")
+	if err != nil {
+		panic(fmt.Sprintf("Error querying lobbies %s", err))
+	}
+
+	for lobbies.Next() {
+		var id string
+		var name string
+		var mode int
+		var genre string
+		var public bool
+		var uri sql.NullString
+		var artist string
+
+		if err := lobbies.Scan(&id, &name, &mode, &genre, &public, &uri); err != nil {
+			panic(fmt.Sprintf("Error parsing lobby: %s", err))
+		}
+		lobby := NewLobby(id, name, LobbyMode(mode), genre, public, "")
+
+		// Add the current track if there was one.
+		if uri.Valid {
+			err := db.QueryRow("select uri, name, artist from Track where uri=?", uri).Scan(&uri, &name, &artist)
+			if err != nil && err != sql.ErrNoRows {
+				panic(fmt.Sprintf("Error querying track: %s", err))
+			}
+			lobby.CurrentTrack = &Track{URI: uri.String, Name: name, Artist: artist}
+		}
+
+		// Add the queue.
+		queue, err := db.Query(
+			`select trackURI, name, artist from Queue
+            join Track on(Track.uri = Queue.trackURI)
+            where lobbyID=?
+            order by rank asc`, id)
+		if err != nil {
+			panic(fmt.Sprintf("Error querying queue: %s", err))
+		}
+
+		for queue.Next() {
+			if err := queue.Scan(&uri, &name, &artist); err != nil {
+				panic(fmt.Sprintf("Error parsing queue: %s", err))
+			}
+
+			lobby.TrackQueue.Push(&Track{URI: uri.String, Name: name, Artist: artist})
+		}
+
+		Lobbies[id] = lobby
+	}
+}
+
 // This is here for convenience during developement.
 func initialiseTestLobby() {
 	id := UniqueLobbyID()
@@ -109,14 +175,23 @@ func initialiseTestLobby() {
 }
 
 func main() {
-	initialiseTestLobby()
-	router := mux.NewRouter()
-
-	router.HandleFunc("/lobbies", GetLobbies).Methods("GET")
-	router.HandleFunc("/lobbies/{id}", GetLobby).Methods("GET")
-	router.HandleFunc("/lobbies/{id}/join", JoinLobby).Queries("username", "").Methods("GET")
-	router.HandleFunc("/lobbies/create", CreateLobby).Methods("POST")
-
 	log.Printf("Starting server")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	//initialiseTestLobby()
+	loadFromDB()
+	for k, v := range Lobbies {
+		log.Printf("%s: %s %#v\n", k, v.Name, v.CurrentTrack)
+		for _, track := range v.TrackQueue {
+			log.Printf("%#v\n", track)
+		}
+	}
+
+	//router := mux.NewRouter()
+
+	//router.HandleFunc("/lobbies", GetLobbies).Methods("GET")
+	//router.HandleFunc("/lobbies/{id}", GetLobby).Methods("GET")
+	//router.HandleFunc("/lobbies/{id}/join", JoinLobby).Queries("username", "").Methods("GET")
+	//router.HandleFunc("/lobbies/create", CreateLobby).Methods("POST")
+
+	//log.Printf("Server started")
+	//log.Fatal(http.ListenAndServe(":8080", router))
 }

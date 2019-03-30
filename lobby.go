@@ -162,13 +162,13 @@ func (l *Lobby) listenForClientMsgs() {
 				l.log("Skip vote passed")
 				// Inform all users that the vote passed.
 				l.sendServerMessage("Skip vote passed.")
-				if l.TrackQueue.isEmpty() {
+				if l.TrackQueue.IsEmpty() {
 					// Clear the current song so that any songs added after will auto play.
 					l.CurrentTrack = nil
 					// TODO return error instead of continuing once errors have been added to the message struct.
 				} else {
 					// Return the next song in the queue.
-					nextTrack := l.TrackQueue.pop()
+					nextTrack := l.TrackQueue.Pop()
 					//l.GetPlayMessage(nextTrack)
 					l.setPlayMessage(&outMsg, nextTrack)
 				}
@@ -245,7 +245,7 @@ func (l *Lobby) queueOrPlay(msg *Message, track *Track) {
 // addToQueue adds the provided track to the track queue.
 func (l *Lobby) addToQueue(track *Track) {
 	l.log(fmt.Sprintf("Adding track to queue: %#v", track))
-	l.TrackQueue.push(track)
+	l.TrackQueue.Push(track)
 }
 
 // Returns true if more than half the lobby members have voted to skip, otherwise false.
