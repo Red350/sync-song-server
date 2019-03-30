@@ -301,7 +301,9 @@ func (l *Lobby) persistCurrentTrackState() {
 	go func() {
 		if err := persistCurrentTrack(l); err != nil {
 			l.log(fmt.Sprintf("Failed to persist current track: %s", err))
+			return
 		}
+		l.log("Current track state written to db")
 	}()
 }
 
@@ -310,7 +312,9 @@ func (l *Lobby) persistQueueState() {
 	go func() {
 		if err := persistQueue(l); err != nil {
 			l.log(fmt.Sprintf("Failed to persist queue: %s", err))
+			return
 		}
+		l.log("Queue state written to db")
 	}()
 }
 

@@ -105,42 +105,13 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// This is here for convenience during developement.
-func initialiseTestLobby() {
-	lobby := NewLobby("SQRT", "Test Lobby", FREE_FOR_ALL, "Whatev", true, "red350")
-	log.Printf("Test lobby created. Remove this before deployment.")
-	if err := insertLobby(lobby); err != nil {
-		panic(fmt.Sprintf("Failed to insert lobby: %s", err))
-	}
-}
-
 func main() {
 	log.Printf("Starting server")
-	//initialiseTestLobby()
 	// Load lobby state from the database.
 	if err := loadFromDB(&Lobbies); err != nil {
 		log.Printf("Failed to load lobbies from db: %s", err)
 	}
 	log.Printf("Lobby state loaded")
-
-	//Lobbies["SQRT"].CurrentTrack = &Track{URI: "new", Name: "new", Artist: "new"}
-	//Lobbies["SQRT"].TrackQueue.Push(&Track{URI: "queue", Name: "queue", Artist: "queue"})
-	//Lobbies["SQRT"].TrackQueue.Push(&Track{URI: "queue2", Name: "queue", Artist: "queue"})
-
-	//if err := persistQueue(Lobbies["SQRT"]); err != nil {
-	//	log.Printf("Failed to persist queue: %s", err)
-	//}
-	//if err := persistCurrentTrack(Lobbies["SQRT"]); err != nil {
-	//	log.Printf("Failed to persist current track: %s", err)
-	//}
-
-	//log.Printf("")
-	//for k, v := range Lobbies {
-	//	log.Printf("%s: %s %#v\n", k, v.Name, v.CurrentTrack)
-	//	for _, track := range v.TrackQueue {
-	//		log.Printf("%#v\n", track)
-	//	}
-	//}
 
 	router := mux.NewRouter()
 
