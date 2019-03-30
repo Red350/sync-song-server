@@ -110,6 +110,62 @@ func dbConn() (*sql.DB, error) {
 	return db, nil
 }
 
+func insertLobby(lobby *Lobby) error {
+	db, err := dbConn()
+	if err != nil {
+		return fmt.Errorf("failed to get database connection: %s", err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %s", err)
+	}
+	var public int
+	if lobby.Public {
+		public = 1
+	}
+	stmt, err := tx.Prepare(`
+        insert into Lobby(id, name, mode, genre, public, currentUri)
+        values(?, ?, ?, ?, ?, '');`)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to prepare statement: %s", err)
+	}
+	if _, err := stmt.Exec(lobby.ID, lobby.Name, lobby.LobbyMode, lobby.Genre, public); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to execute statement: %s", err)
+	}
+
+	return tx.Commit()
+}
+
+func persistTracks(lobby *Lobby) error {
+	db, err := dbConn()
+	if err != nil {
+		return fmt.Errorf("failed to get database connection: %s", err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %s", err)
+	}
+	var public int
+	if lobby.Public {
+		public = 1
+	}
+	stmt, err := tx.Prepare(`
+        insert into Lobby(id, name, mode, genre, public, currentUri)
+        values(?, ?, ?, ?, ?, '');`)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to prepare statement: %s", err)
+	}
+	if _, err := stmt.Exec(lobby.ID, lobby.Name, lobby.LobbyMode, lobby.Genre, public); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to execute statement: %s", err)
+	}
+
+	return tx.Commit()
+}
+
 func loadFromDB() {
 	db, err := dbConn()
 	if err != nil {
@@ -171,12 +227,13 @@ func initialiseTestLobby() {
 	id := UniqueLobbyID()
 	l := NewLobby(id, "Test Lobby", FREE_FOR_ALL, "Whatev", true, "red350")
 	Lobbies[id] = l
+	insertLobby(l)
 	log.Printf("Test lobby created. Remove this before deployment.")
 }
 
 func main() {
 	log.Printf("Starting server")
-	//initialiseTestLobby()
+	initialiseTestLobby()
 	loadFromDB()
 	for k, v := range Lobbies {
 		log.Printf("%s: %s %#v\n", k, v.Name, v.CurrentTrack)
