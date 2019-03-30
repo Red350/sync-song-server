@@ -99,7 +99,7 @@ func insertLobby(lobby *Lobby) error {
 	return tx.Commit()
 }
 
-func persistTracks(lobby *Lobby) error {
+func persistQueue(lobby *Lobby) error {
 	// Connect to db.
 	db, err := dbConn()
 	if err != nil {
@@ -121,21 +121,6 @@ func persistTracks(lobby *Lobby) error {
 		return fmt.Errorf("failed to delete lobby queue: %s", err)
 	}
 
-	// Insert current track.
-	if err := insertTrack(tx, lobby.CurrentTrack); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to insert current track: %s", err)
-	}
-
-	// TODO set current track update lobby
-	stmt, err := tx.Prepare(`update lobby set currentUri=? where id=?`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare update current track statement: %s", err)
-	}
-	defer stmt.Close()
-	if _, err := stmt.Exec(lobby.CurrentTrack.URI, lobby.ID); err != nil {
-		return fmt.Errorf("failed to execute update current track statement: %s", err)
-	}
 	// Insert queued tracks.
 	for rank, track := range lobby.TrackQueue {
 		if err := insertTrack(tx, track); err != nil {
@@ -146,6 +131,41 @@ func persistTracks(lobby *Lobby) error {
 			tx.Rollback()
 			return fmt.Errorf("failed to queue track: %s", err)
 		}
+	}
+
+	return tx.Commit()
+}
+
+func persistCurrentTrack(lobby *Lobby) error {
+	// Connect to db.
+	db, err := dbConn()
+	if err != nil {
+		return fmt.Errorf("failed to get database connection: %s", err)
+	}
+
+	// Begin transaction.
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %s", err)
+	}
+
+	// Insert current track and update lobby's current track.
+	if err := insertTrack(tx, lobby.CurrentTrack); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to insert current track: %s", err)
+	}
+	var uri sql.NullString
+	if lobby.CurrentTrack != nil {
+		uri.Valid = true
+		uri.String = lobby.CurrentTrack.URI
+	}
+	stmt, err := tx.Prepare(`update lobby set currentUri=? where id=?`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare update current track statement: %s", err)
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(uri, lobby.ID); err != nil {
+		return fmt.Errorf("failed to execute update current track statement: %s", err)
 	}
 
 	return tx.Commit()

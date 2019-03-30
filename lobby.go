@@ -34,6 +34,11 @@ type Lobby struct {
 	InMsgs      chan Message    `json:"-"`
 }
 
+func (l *Lobby) SetCurrentTrack(track *Track) {
+	l.CurrentTrack = track
+	l.persistCurrentTrackState()
+}
+
 func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string) *Lobby {
 	lobby := Lobby{
 		ID:         id,
@@ -164,12 +169,12 @@ func (l *Lobby) listenForClientMsgs() {
 				l.sendServerMessage("Skip vote passed.")
 				if l.TrackQueue.IsEmpty() {
 					// Clear the current song so that any songs added after will auto play.
-					l.CurrentTrack = nil
+					l.SetCurrentTrack(nil)
 					// TODO return error instead of continuing once errors have been added to the message struct.
 				} else {
 					// Return the next song in the queue.
 					nextTrack := l.TrackQueue.Pop()
-					//l.GetPlayMessage(nextTrack)
+					l.persistQueueState()
 					l.setPlayMessage(&outMsg, nextTrack)
 				}
 			}
@@ -215,7 +220,7 @@ func (l *Lobby) setPlayMessage(msg *Message, track *Track) {
 	msg.Command = Command(PLAY)
 
 	// Update lobby state.
-	l.CurrentTrack = track
+	l.SetCurrentTrack(track)
 	// Clear any outstanding votes to skip the previous song.
 	l.SkipVotes = make(map[string]bool)
 }
@@ -246,6 +251,7 @@ func (l *Lobby) queueOrPlay(msg *Message, track *Track) {
 func (l *Lobby) addToQueue(track *Track) {
 	l.log(fmt.Sprintf("Adding track to queue: %#v", track))
 	l.TrackQueue.Push(track)
+	l.persistQueueState()
 }
 
 // Returns true if more than half the lobby members have voted to skip, otherwise false.
@@ -288,6 +294,24 @@ func (l *Lobby) sendInitialState(c *Client) {
 	}
 	l.log(fmt.Sprintf("Sending lobby state to %s", c.Username))
 	c.Send(stateMsg)
+}
+
+// persistCurrentTrackState asynchronously writes the current track to the database.
+func (l *Lobby) persistCurrentTrackState() {
+	go func() {
+		if err := persistCurrentTrack(l); err != nil {
+			l.log(fmt.Sprintf("Failed to persist current track: %s", err))
+		}
+	}()
+}
+
+// persistQueueState asynchronously writes the queue to the database.
+func (l *Lobby) persistQueueState() {
+	go func() {
+		if err := persistQueue(l); err != nil {
+			l.log(fmt.Sprintf("Failed to persist queue: %s", err))
+		}
+	}()
 }
 
 // log logs a message with the lobby ID prefixed.
