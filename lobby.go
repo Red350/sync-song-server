@@ -33,7 +33,7 @@ type Lobby struct {
 	SkipVotes   map[string]bool `json"-"`
 	NumMembers  int             `json:"numMembers"`
 	InMsgs      chan Message    `json:"-"`
-	TrackTimer  *time.Timer     `json:"-"`
+	TrackTimer  *MillisTimer    `json:"-"`
 }
 
 func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string) *Lobby {
@@ -49,7 +49,6 @@ func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public 
 		SkipVotes:  make(map[string]bool),
 		NumMembers: 0,
 		InMsgs:     make(chan Message, 10),
-		TrackTimer: time.NewTimer(time.Duration(-1)),
 	}
 
 	// TODO maybe this should be moved to where lobbies are created
@@ -203,7 +202,7 @@ func (l *Lobby) playTrack(msg *Message, track *Track) {
 	// Update lobby state with regards to the current track.
 	l.SetCurrentTrack(track)
 
-	// If there is no current track, send a pause command.
+	// If there is no current track send a pause command.
 	if track == nil {
 		msg.Command = Command(PAUSE)
 		return
@@ -211,13 +210,16 @@ func (l *Lobby) playTrack(msg *Message, track *Track) {
 
 	msg.CurrentTrack = track
 	msg.Command = Command(PLAY)
+	msg.Timestamp = NowMillis() + int64(time.Second)
 
-	// Start the timer for when the song will end
-	l.TrackTimer.Stop() // Stop any current timer.
-	durationNanos := time.Duration(track.Duration) * time.Millisecond
-	l.log("Starting track timer: %s: %s", track.Name, durationNanos)
-	l.TrackTimer = time.AfterFunc(durationNanos, func() {
+	// Start the timer for when the track will end.
+	if l.TrackTimer != nil {
+		l.TrackTimer.Stop() // Stop any current timer.
+	}
+	l.log("Starting track timer: %s: %s", track.Name, track.Duration)
+	l.TrackTimer = NewMillisTimer(track.Duration, func() {
 		l.log("Timer ended for %s, starting next song", track.Name)
+		l.TrackTimer = nil
 		msg := Message{}
 		l.playNext(&msg)
 		l.setStateMessage(&msg)
@@ -288,8 +290,17 @@ func (l *Lobby) sendToAll(msg Message) {
 }
 
 // setStateMessage loads the lobby state into the provided message.
+// Adds the timestamp of the current track offset by a second, and
+// also the timestamp at which point the command should be execute.
 func (l *Lobby) setStateMessage(msg *Message) {
 	msg.CurrentTrack = l.CurrentTrack
+
+	// If there is a track timer running, add the position and a timestamp
+	// to the message.
+	if l.TrackTimer != nil {
+		msg.CurrentTrack.Position = l.TrackTimer.TimePassed() + int64(time.Second)
+		msg.Timestamp = NowMillis() + int64(time.Second)
+	}
 	msg.TrackQueue = l.TrackQueue
 	msg.Admin = l.Admin
 	msg.ClientNames = l.ClientNames
