@@ -133,7 +133,6 @@ func (l *Lobby) listenForClientMsgs() {
 		inMsg := <-l.InMsgs
 		// TODO could do all this inside of a goroutine, otherwise a single thread is dealing with all user requests.
 		// Though maybe its better not to, to avoid race conditions.
-		l.log(fmt.Sprintf("Received message from %s: %#v", inMsg.Username, inMsg))
 		outMsg := Message{Username: inMsg.Username}
 
 		// Attach a user message to the outgoing message if exists.

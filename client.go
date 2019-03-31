@@ -10,11 +10,13 @@ import (
 
 // Client represents a single user who is connected to the server.
 type Client struct {
-	Conn      *websocket.Conn
-	Username  string
-	Lobby     *Lobby
-	Latency   int
-	Offset    int
+	Conn     *websocket.Conn
+	Username string
+	Lobby    *Lobby
+	Latency  int64
+	// Offset is the time in millis by which the app is ahead, negative meaning it is behind.
+	// Stored as int64 to avoid the need to cast when adding to message timestamp.
+	Offset    int64
 	sendMutex sync.Mutex
 }
 
@@ -39,6 +41,12 @@ func NewClient(conn *websocket.Conn, username string, lobby *Lobby) Client {
 func (c *Client) Send(msg Message) error {
 	c.sendMutex.Lock()
 	defer c.sendMutex.Unlock()
+
+	// Update the timestamp based on this client's offset.
+	if ServerCommand(msg.Command) != S_HANDSHAKE && msg.Timestamp != 0 {
+		c.log(fmt.Sprintf("Modifying outgoing timestamp %d by %d", msg.Timestamp, c.Offset))
+		msg.Timestamp += c.Offset
+	}
 	c.log(fmt.Sprintf("Sending message: %#v", msg))
 	return c.Conn.WriteJSON(msg)
 }
@@ -53,6 +61,7 @@ func (c *Client) ReadIncomingMessages() error {
 			return fmt.Errorf("failed to read message: %s", err)
 		}
 		msg.Username = c.Username
+		c.log(fmt.Sprintf("Received message: %#v", msg))
 		c.Lobby.InMsgs <- msg
 	}
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"sort"
 )
@@ -18,45 +17,47 @@ type HandshakeResponse struct {
 func performClockHandshake(c *Client) error {
 	var responses []HandshakeResponse
 	for i := 1; i <= 5; i++ {
+		// Send handshake.
 		serverBefore := NowMillis()
 		c.Send(Message{Command: Command(S_HANDSHAKE), Timestamp: serverBefore})
+
+		// Receive handshake ack.
 		msg := Message{}
 		if err := c.Conn.ReadJSON(&msg); err != nil {
 			return fmt.Errorf("failed to read message: %s", err)
 		}
-
 		serverAfter := NowMillis()
 		if ClientCommand(msg.Command) != C_HANDSHAKE {
 			return fmt.Errorf("handshake not completed, received instead: %#v", msg)
 		}
 
+		// Calculate latency and offset for this particular message.
 		appTime := msg.Timestamp
 		latency := (serverAfter - serverBefore) / 2
-		// offset is the amount by which the app is ahead, negative meaning behind.
 		offset := appTime - serverBefore - latency
 		responses = append(responses, HandshakeResponse{latency: int(latency), offset: int(offset)})
 	}
 
-	latency, offset := determineLatencyAndOffset(responses)
-	c.Latency = latency
-	c.Offset = offset
+	latency, offset := determineLatencyAndOffset(c, responses)
+	c.Latency = int64(latency)
+	c.Offset = int64(offset)
 	// Inform the client that the handshake is complete.
 	c.Send(Message{Command: Command(S_HANDSHAKE), Timestamp: 0})
 	return nil
 }
 
-func determineLatencyAndOffset(responses []HandshakeResponse) (int, int) {
+func determineLatencyAndOffset(c *Client, responses []HandshakeResponse) (int, int) {
 	median, mad := medianAbsoluteDeviation(responses)
 	upperOutlier := median + 3*mad
 	lowerOutlier := median - 3*mad
 
 	var usable []HandshakeResponse
 	for _, v := range responses {
-		if v.latency < upperOutlier && v.latency > lowerOutlier {
+		if v.latency <= upperOutlier && v.latency >= lowerOutlier {
 			usable = append(usable, v)
-			log.Printf("%d %d Yes", v.latency, v.offset)
+			c.log(fmt.Sprintf("Using: latency: %d, offset:%d", v.latency, v.offset))
 		} else {
-			log.Printf("%d %d No", v.latency, v.offset)
+			c.log(fmt.Sprintf("Discarding: latency: %d, offset:%d", v.latency, v.offset))
 		}
 	}
 
