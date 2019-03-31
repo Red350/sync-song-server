@@ -30,6 +30,7 @@ func performClockHandshake(c *Client) error {
 		if ClientCommand(msg.Command) != C_HANDSHAKE {
 			return fmt.Errorf("handshake not completed, received instead: %#v", msg)
 		}
+		c.log("Received handshake ack: %#v", msg)
 
 		// Calculate latency and offset for this particular message.
 		appTime := msg.Timestamp

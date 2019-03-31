@@ -318,6 +318,6 @@ func (l *Lobby) persistQueueState() {
 }
 
 // log logs a message with the lobby ID prefixed.
-func (l *Lobby) log(msg string) {
-	log.Printf("%s: %s", l.ID, msg)
+func (l *Lobby) log(msg string, a ...interface{}) {
+	log.Printf(fmt.Sprintf("%s: %s", l.ID, msg), a...)
 }

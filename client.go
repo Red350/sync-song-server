@@ -32,7 +32,7 @@ func NewClient(conn *websocket.Conn, username string, lobby *Lobby) Client {
 	if err := performClockHandshake(&client); err != nil {
 		log.Printf("Failed to perform clock handshake: %s", err)
 	}
-	client.log(fmt.Sprintf("Handshake complete: latency: %d, offset:%d", client.Latency, client.Offset))
+	client.log("Handshake complete: latency: %d, offset:%d", client.Latency, client.Offset)
 
 	return client
 }
@@ -47,7 +47,7 @@ func (c *Client) Send(msg Message) error {
 		c.log(fmt.Sprintf("Modifying outgoing timestamp %d by %d", msg.Timestamp, c.Offset))
 		msg.Timestamp += c.Offset
 	}
-	c.log(fmt.Sprintf("Sending message: %#v", msg))
+	c.log("Sending message: %#v", msg)
 	return c.Conn.WriteJSON(msg)
 }
 
@@ -61,11 +61,11 @@ func (c *Client) ReadIncomingMessages() error {
 			return fmt.Errorf("failed to read message: %s", err)
 		}
 		msg.Username = c.Username
-		c.log(fmt.Sprintf("Received message: %#v", msg))
+		c.log("Received message: %#v", msg)
 		c.Lobby.InMsgs <- msg
 	}
 }
 
-func (c *Client) log(msg string) {
-	c.Lobby.log(fmt.Sprintf("%s: %s", c.Username, msg))
+func (c *Client) log(msg string, a ...interface{}) {
+	c.Lobby.log(fmt.Sprintf("%s: %s", c.Username, msg), a...)
 }
