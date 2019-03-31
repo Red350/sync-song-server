@@ -22,6 +22,10 @@ type Message struct {
 
 	// User messages.
 	UserMsg string `json:"userMsg,omitempty"`
+
+	// Time at which a command should be executed.
+	// Also used for the clock handshake.
+	Timestamp int64 `json:"timestamp,omitempty"`
 }
 
 type Track struct {

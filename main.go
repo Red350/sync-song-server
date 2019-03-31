@@ -107,11 +107,11 @@ func JoinLobby(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	log.Printf("Starting server")
-	// Load lobby state from the database.
+	log.Printf("Loading stored lobby states")
 	if err := loadFromDB(&Lobbies); err != nil {
 		log.Printf("Failed to load lobbies from db: %s", err)
 	}
-	log.Printf("Lobby state loaded")
+	log.Printf("Lobby states loaded")
 
 	router := mux.NewRouter()
 

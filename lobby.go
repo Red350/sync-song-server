@@ -62,8 +62,7 @@ func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public 
 func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	// Each client shares the same InMsg channel, allowing the server to
 	// conveniently read from all clients.
-	client := NewClient(conn, username, l.InMsgs)
-	l.NumMembers++
+	client := NewClient(conn, username, l)
 
 	go func() {
 		err := client.ReadIncomingMessages()
@@ -72,6 +71,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 		l.disconnect(&client)
 	}()
 
+	l.NumMembers++
 	l.Clients[username] = &client
 	l.ClientNames = append(l.ClientNames, username)
 
@@ -86,7 +86,7 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	// Send the initial state of the lobby to the client.
 	l.sendInitialState(&client)
 
-	// Update all client's state.
+	// Update all clients' state.
 	l.sendStateToAll()
 
 	return client
