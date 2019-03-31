@@ -189,13 +189,13 @@ func insertTrack(tx *sql.Tx, track *Track) error {
 		return nil
 	}
 	stmt, err := tx.Prepare(`
-        insert ignore into track(uri, name, artist)
-        values(?, ?, ?);`)
+        insert ignore into track(uri, name, artist, duration)
+        values(?, ?, ?, ?);`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare track statement: %s", err)
 	}
 	defer stmt.Close()
-	if _, err := stmt.Exec(track.URI, track.Name, track.Artist); err != nil {
+	if _, err := stmt.Exec(track.URI, track.Name, track.Artist, track.Duration); err != nil {
 		return fmt.Errorf("failed to execute track statement: %s", err)
 	}
 	return nil

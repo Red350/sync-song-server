@@ -7,7 +7,8 @@ drop table if exists track;
 create table track(
     uri varchar(100) primary key,
     name varchar(200) not null,
-    artist varchar(200) not null
+    artist varchar(200) not null,
+    duration bigint not null
 );
 
 create table lobby(

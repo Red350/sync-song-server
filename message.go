@@ -38,6 +38,9 @@ type Track struct {
 	// Name of the artist.
 	Artist string `json:"artist,omitempty"`
 
+	// Duration of the track in millis.
+	Duration int64 `json:"duration,omitempty"`
+
 	// Song position in millis.
 	Position int64 `json:"position,omitempty"`
 
