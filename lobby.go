@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -32,11 +33,7 @@ type Lobby struct {
 	SkipVotes   map[string]bool `json"-"`
 	NumMembers  int             `json:"numMembers"`
 	InMsgs      chan Message    `json:"-"`
-}
-
-func (l *Lobby) SetCurrentTrack(track *Track) {
-	l.CurrentTrack = track
-	l.persistCurrentTrackState()
+	TrackTimer  *time.Timer     `json:"-"`
 }
 
 func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string) *Lobby {
@@ -52,6 +49,7 @@ func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public 
 		SkipVotes:  make(map[string]bool),
 		NumMembers: 0,
 		InMsgs:     make(chan Message, 10),
+		TrackTimer: time.NewTimer(time.Duration(-1)),
 	}
 
 	// TODO maybe this should be moved to where lobbies are created
@@ -166,16 +164,7 @@ func (l *Lobby) listenForClientMsgs() {
 				l.log("Skip vote passed")
 				// Inform all users that the vote passed.
 				l.sendServerMessage("Skip vote passed.")
-				if l.TrackQueue.IsEmpty() {
-					// Clear the current song so that any songs added after will auto play.
-					l.SetCurrentTrack(nil)
-					// TODO return error instead of continuing once errors have been added to the message struct.
-				} else {
-					// Return the next song in the queue.
-					nextTrack := l.TrackQueue.Pop()
-					l.persistQueueState()
-					l.setPlayMessage(&outMsg, nextTrack)
-				}
+				l.playNext(&outMsg)
 			}
 		case PROMOTE:
 			if inMsg.Username == l.Admin {
@@ -196,6 +185,69 @@ func (l *Lobby) sendServerMessage(msg string) {
 	l.sendToAll(Message{UserMsg: msg})
 }
 
+// SetCurrentTrack sets the current track to the provided track, persists it to the database,
+// and clears any outstanding skip votes.
+func (l *Lobby) SetCurrentTrack(track *Track) {
+	l.CurrentTrack = track
+
+	// Clear any outstanding votes to skip the previous track.
+	l.SkipVotes = make(map[string]bool)
+
+	// Update the database.
+	l.persistCurrentTrackState()
+}
+
+// playTrack adds the track and PLAY command to the message struct, and calls SetCurrentTrack.
+// It then starts a timer to keep track of when the song will end.
+func (l *Lobby) playTrack(msg *Message, track *Track) {
+	// Update lobby state with regards to the current track.
+	l.SetCurrentTrack(track)
+
+	// If there is no current track, send a pause command.
+	if track == nil {
+		msg.Command = Command(PAUSE)
+		return
+	}
+
+	msg.CurrentTrack = track
+	msg.Command = Command(PLAY)
+
+	// Start the timer for when the song will end
+	l.TrackTimer.Stop() // Stop any current timer.
+	durationNanos := time.Duration(track.Duration) * time.Millisecond
+	l.log("Starting track timer: %s: %s", track.Name, durationNanos)
+	l.TrackTimer = time.AfterFunc(durationNanos, func() {
+		l.log("Timer ended for %s, starting next song", track.Name)
+		msg := Message{}
+		l.playNext(&msg)
+		l.setStateMessage(&msg)
+		l.sendToAll(msg)
+	})
+}
+
+// playNext pops the next track from the queue, updates the database, and calls playTrack.
+func (l *Lobby) playNext(msg *Message) {
+	var nextTrack *Track = nil
+	if !l.TrackQueue.IsEmpty() {
+		nextTrack = l.TrackQueue.Pop()
+		l.persistQueueState()
+	}
+	l.playTrack(msg, nextTrack)
+}
+
+// queueOrPlay queues the track if another track is already playing, otherwise
+// plays it immediately.
+func (l *Lobby) queueOrPlay(msg *Message, track *Track) {
+	if l.CurrentTrack == nil {
+		l.playTrack(msg, track)
+	} else {
+		l.addToQueue(track)
+		msg.Command = Command(QUEUE)
+		// This is redundant as the queue is currently always added, but that may be changed in future.
+		msg.TrackQueue = l.TrackQueue
+	}
+}
+
 func (l *Lobby) promoteToAdmin(newAdmin string) {
 	// Check that the the user being promoted is actually a lobby member.
 	if _, ok := l.Clients[newAdmin]; !ok {
@@ -210,40 +262,6 @@ func (l *Lobby) promoteToAdmin(newAdmin string) {
 
 	l.log(promoteStr)
 	l.sendToAll(promoteMsg)
-}
-
-// setPlayMessage adds the track and PLAY command to the message struct.
-// It also clears any outstanding skip votes.
-func (l *Lobby) setPlayMessage(msg *Message, track *Track) {
-	msg.CurrentTrack = track
-	msg.Command = Command(PLAY)
-
-	// Update lobby state.
-	l.SetCurrentTrack(track)
-	// Clear any outstanding votes to skip the previous song.
-	l.SkipVotes = make(map[string]bool)
-}
-
-// playCurrentTrack sends a command to all lobby members to play the current track.
-func (l *Lobby) playCurrentTrack() {
-	l.log(fmt.Sprintf("Playing %#v", l.CurrentTrack))
-	l.sendToAll(Message{
-		CurrentTrack: l.CurrentTrack,
-		Command:      Command(PLAY),
-	})
-}
-
-// queueOrPlay queues the track if another track is already playing, otherwise
-// plays it immediately.
-func (l *Lobby) queueOrPlay(msg *Message, track *Track) {
-	if l.CurrentTrack == nil {
-		l.setPlayMessage(msg, track)
-	} else {
-		l.addToQueue(track)
-		msg.Command = Command(QUEUE)
-		// This is redundant as the queue is currently always added, but that may be changed in future.
-		msg.TrackQueue = l.TrackQueue
-	}
 }
 
 // addToQueue adds the provided track to the track queue.
