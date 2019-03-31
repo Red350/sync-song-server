@@ -15,6 +15,9 @@ type HandshakeResponse struct {
 // performHandshake performs a clock handshake between client and server
 // to determine the latency and clock offset for this client.
 func performClockHandshake(c *Client) error {
+	// We need to send the "end handshake" message no matter how the function exits.
+	defer c.Send(Message{Command: Command(S_HANDSHAKE), Timestamp: 0})
+
 	var responses []HandshakeResponse
 	for i := 1; i <= 5; i++ {
 		// Send handshake.
@@ -42,8 +45,6 @@ func performClockHandshake(c *Client) error {
 	latency, offset := determineLatencyAndOffset(c, responses)
 	c.Latency = int64(latency)
 	c.Offset = int64(offset)
-	// Inform the client that the handshake is complete.
-	c.Send(Message{Command: Command(S_HANDSHAKE), Timestamp: 0})
 	return nil
 }
 
