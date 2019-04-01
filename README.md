@@ -4,7 +4,11 @@ Sync Song server
 
 ## Building and running using docker
 
-Clone the repo, and execute the following commands:
+Clone the repo, cd into its directory, and execute the following commands:
+
+`docker run --name ss-mysql -e MYSQL_ROOT_PASSWORD=secret -d mysql:5.6`
+
+`docker exec -i ss-mysql mysql -u root -psecret < ./sync-song.sql`
 
 `docker build -t sync-song-server .`
 

@@ -7,7 +7,7 @@ import (
 
 // dbConn returns a connection to the database.
 func dbConn() (*sql.DB, error) {
-	db, err := sql.Open("mysql", "root:@/syncsong")
+	db, err := sql.Open("mysql", "root:secret@tcp(127.0.0.1:3306)/syncsong")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %s", err)
 	}

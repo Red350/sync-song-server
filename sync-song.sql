@@ -1,3 +1,4 @@
+create database syncsong;
 use syncsong;
 
 drop table if exists queue;
