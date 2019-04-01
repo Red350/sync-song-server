@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 )
 
 // dbConn returns a connection to the database.
@@ -205,7 +204,6 @@ func insertTrack(tx *sql.Tx, track *Track) error {
 
 // queueTrack inserts a row to the Queue table with the provided values.
 func queueTrack(tx *sql.Tx, lobbyID string, uri string, rank int) error {
-	log.Printf("Queueing id:%s uri:%s", lobbyID, uri)
 	stmt, err := tx.Prepare(`
         insert into queue(lobbyID, trackURI, rank)
         values(?, ?, ?)`)
