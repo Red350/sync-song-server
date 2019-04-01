@@ -178,11 +178,16 @@ func (l *Lobby) listenForClientMsgs() {
 				l.playNext(&outMsg)
 			}
 		case PROMOTE:
+			// TODO update this to not continue, and instead send from within this function.
 			if inMsg.Username == l.Admin {
 				l.promoteToAdmin(inMsg.Admin)
 			}
+			continue
 		case STATE:
+			// For a state command, we only want to send the state to the client who requested it.
 			l.setStateMessageWithCommand(&outMsg)
+			l.Clients[inMsg.Username].Send(outMsg)
+			continue
 		}
 
 		// No harm in always sending the current lobby state to ensure clients stay in sync with it.
