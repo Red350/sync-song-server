@@ -29,26 +29,28 @@ func loadFromDB(lobbies *map[string]*Lobby) error {
 	// Parse returned rows and add to the lobbies map.
 	for lobbyRows.Next() {
 		var id string
-		var name string
+		var trackName string
+		var lobbyName string
 		var mode int
 		var genre string
 		var public bool
 		var uri sql.NullString
 		var artist string
+		var duration int64
+		var currentTrack *Track
 
-		if err := lobbyRows.Scan(&id, &name, &mode, &genre, &public, &uri); err != nil {
+		if err := lobbyRows.Scan(&id, &lobbyName, &mode, &genre, &public, &uri); err != nil {
 			return fmt.Errorf("failed to read lobby row: %s", err)
 		}
-		lobby := NewLobby(id, name, LobbyMode(mode), genre, public, "")
-
-		// Add the current track if there is one.
+		// Query for the current track.
 		if uri.Valid {
-			err := db.QueryRow("select uri, name, artist from track where uri=?", uri).Scan(&uri, &name, &artist)
+			err := db.QueryRow("select uri, name, artist, duration from track where uri=?", uri).Scan(&uri, &trackName, &artist, &duration)
 			if err != nil && err != sql.ErrNoRows {
 				return fmt.Errorf("failed to read current track: %s", err)
 			}
-			lobby.CurrentTrack = &Track{URI: uri.String, Name: name, Artist: artist}
+			currentTrack = &Track{URI: uri.String, Name: trackName, Artist: artist, Duration: duration}
 		}
+		lobby := NewLobby(id, lobbyName, LobbyMode(mode), genre, public, "", currentTrack)
 
 		// Add the queue.
 		queue, err := db.Query(
@@ -61,11 +63,11 @@ func loadFromDB(lobbies *map[string]*Lobby) error {
 		}
 
 		for queue.Next() {
-			if err := queue.Scan(&uri, &name, &artist); err != nil {
+			if err := queue.Scan(&uri, &trackName, &artist); err != nil {
 				return fmt.Errorf("failed to read queue: %s", err)
 			}
 
-			lobby.TrackQueue.Push(&Track{URI: uri.String, Name: name, Artist: artist})
+			lobby.TrackQueue.Push(&Track{URI: uri.String, Name: trackName, Artist: artist, Duration: duration})
 		}
 
 		(*lobbies)[id] = lobby

@@ -9,6 +9,7 @@ const (
 	ADD_SONG
 	VOTE_SKIP
 	PROMOTE
+	STATE
 )
 
 type ServerCommand Command

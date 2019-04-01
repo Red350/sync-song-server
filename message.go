@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type Message struct {
 	// Who the message originated from (empty string implies the server).
 	Username string `json:"username,omitempty"`
@@ -26,6 +28,15 @@ type Message struct {
 	// Time at which a command should be executed.
 	// Also used for the clock handshake.
 	Timestamp int64 `json:"timestamp,omitempty"`
+}
+
+// Implement stringer interface.
+func (m Message) String() string {
+	str := fmt.Sprintf("Username: %q, Command: %d, Admin: %q, Clients: %s, UserMsg: %q, Timestamp: %d, TrackQueue: %p", m.Username, m.Command, m.Admin, m.ClientNames, m.UserMsg, m.TrackQueue)
+	if m.CurrentTrack != nil {
+		str = fmt.Sprintf("%s, Track: %#v", str, *m.CurrentTrack)
+	}
+	return str
 }
 
 type Track struct {

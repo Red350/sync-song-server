@@ -72,7 +72,7 @@ func CreateLobby(w http.ResponseWriter, r *http.Request) {
 	log.Printf("CreateLobby request received: Name: %q, Mode: %d, Genre: %q, Public: %t, Admin: %q", name, mode, genre, public, admin)
 
 	id := UniqueLobbyID()
-	l := NewLobby(id, name, LobbyMode(mode), genre, public, admin)
+	l := NewLobby(id, name, LobbyMode(mode), genre, public, admin, nil)
 	Lobbies[id] = l
 	// Persist the lobby in the db.
 	if err := insertLobby(l); err != nil {

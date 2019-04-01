@@ -47,7 +47,7 @@ func (c *Client) Send(msg Message) error {
 		c.log(fmt.Sprintf("Modifying outgoing timestamp %d by %d", msg.Timestamp, c.Offset))
 		msg.Timestamp += c.Offset
 	}
-	c.log("Sending message: %#v", msg)
+	c.log("Sending message: %s", msg)
 	return c.Conn.WriteJSON(msg)
 }
 
@@ -61,7 +61,7 @@ func (c *Client) ReadIncomingMessages() error {
 			return fmt.Errorf("failed to read message: %s", err)
 		}
 		msg.Username = c.Username
-		c.log("Received message: %#v", msg)
+		c.log("Received message: %s", msg)
 		c.Lobby.InMsgs <- msg
 	}
 }

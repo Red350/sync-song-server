@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -16,6 +15,10 @@ const (
 	FREE_FOR_ALL
 	ROUND_ROBIN
 )
+
+// The amount of delay in millis to be added to a command.
+// TODO could calculate this based off of client latency, but half a second seems decent for now.
+const COMMAND_DELAY int64 = 500
 
 type Lobby struct {
 	ID           string             `json:"id"`
@@ -36,7 +39,7 @@ type Lobby struct {
 	TrackTimer  *MillisTimer    `json:"-"`
 }
 
-func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string) *Lobby {
+func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public bool, admin string, track *Track) *Lobby {
 	lobby := Lobby{
 		ID:         id,
 		Name:       name,
@@ -53,6 +56,13 @@ func NewLobby(id string, name string, lobbyMode LobbyMode, genre string, public 
 
 	// TODO maybe this should be moved to where lobbies are created
 	go lobby.listenForClientMsgs()
+
+	// Check if we are resuming a lobby with an existing track.
+	if track != nil {
+		msg := Message{}
+		lobby.playTrack(&msg, track)
+		lobby.sendToAll(msg)
+	}
 	return &lobby
 }
 
@@ -61,6 +71,10 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	// conveniently read from all clients.
 	client := NewClient(conn, username, l)
 
+	// Inform clients that a new user has joined.
+	l.sendServerMessage(fmt.Sprintf("%s has joined the lobby.", username))
+
+	// Read messages from the new client.
 	go func() {
 		err := client.ReadIncomingMessages()
 		l.log(fmt.Sprintf("%s disconnected: %s", client.Username, err))
@@ -72,18 +86,16 @@ func (l *Lobby) join(conn *websocket.Conn, username string) Client {
 	l.Clients[username] = &client
 	l.ClientNames = append(l.ClientNames, username)
 
-	// Inform clients that a new user has joined and update their state.
-	l.sendServerMessage(fmt.Sprintf("%s has joined the lobby.", username))
-
 	// Make this user the admin if there is none.
 	if l.Admin == "" {
 		l.promoteToAdmin(username)
 	}
 
 	// Send the initial state of the lobby to the client.
-	l.sendInitialState(&client)
+	// Disabled for now, as the client requests state instead.
+	//l.sendInitialState(&client)
 
-	// Update all clients' state.
+	// Update all clients' state to inform them of the new client.
 	l.sendStateToAll()
 
 	return client
@@ -169,6 +181,8 @@ func (l *Lobby) listenForClientMsgs() {
 			if inMsg.Username == l.Admin {
 				l.promoteToAdmin(inMsg.Admin)
 			}
+		case STATE:
+			l.setStateMessageWithCommand(&outMsg)
 		}
 
 		// No harm in always sending the current lobby state to ensure clients stay in sync with it.
@@ -180,8 +194,8 @@ func (l *Lobby) listenForClientMsgs() {
 }
 
 // sendServerMessage asynchronously sends a server message to all users.
-func (l *Lobby) sendServerMessage(msg string) {
-	l.sendToAll(Message{UserMsg: msg})
+func (l *Lobby) sendServerMessage(msg string, a ...interface{}) {
+	l.sendToAll(Message{UserMsg: fmt.Sprintf(msg, a...)})
 }
 
 // SetCurrentTrack sets the current track to the provided track, persists it to the database,
@@ -199,24 +213,29 @@ func (l *Lobby) SetCurrentTrack(track *Track) {
 // playTrack adds the track and PLAY command to the message struct, and calls SetCurrentTrack.
 // It then starts a timer to keep track of when the song will end.
 func (l *Lobby) playTrack(msg *Message, track *Track) {
+	l.log("Playing %#v", track)
 	// Update lobby state with regards to the current track.
 	l.SetCurrentTrack(track)
 
 	// If there is no current track send a pause command.
 	if track == nil {
+		l.sendServerMessage("No tracks in queue, add a track to play it now.")
 		msg.Command = Command(PAUSE)
 		return
 	}
 
+	// Inform lobby that new track is playing.
+	l.sendServerMessage("Now playing: %s - %s", track.Name, track.Artist)
+
 	msg.CurrentTrack = track
 	msg.Command = Command(PLAY)
-	msg.Timestamp = NowMillis() + int64(time.Second)
+	msg.Timestamp = NowMillis() + COMMAND_DELAY
 
 	// Start the timer for when the track will end.
 	if l.TrackTimer != nil {
 		l.TrackTimer.Stop() // Stop any current timer.
 	}
-	l.log("Starting track timer: %s: %s", track.Name, track.Duration)
+	l.log("Starting track timer: %s: %d", track.Name, track.Duration)
 	l.TrackTimer = NewMillisTimer(track.Duration, func() {
 		l.log("Timer ended for %s, starting next song", track.Name)
 		l.TrackTimer = nil
@@ -289,6 +308,15 @@ func (l *Lobby) sendToAll(msg Message) {
 	}()
 }
 
+// setStateMessageWithCommand calls setStateMessage, but also
+// adds a the relevant command to update play position.
+func (l *Lobby) setStateMessageWithCommand(msg *Message) {
+	l.setStateMessage(msg)
+	if l.TrackTimer != nil && msg.CurrentTrack != nil {
+		msg.Command = Command(SEEK_TO)
+	}
+}
+
 // setStateMessage loads the lobby state into the provided message.
 // Adds the timestamp of the current track offset by a second, and
 // also the timestamp at which point the command should be execute.
@@ -297,9 +325,9 @@ func (l *Lobby) setStateMessage(msg *Message) {
 
 	// If there is a track timer running, add the position and a timestamp
 	// to the message.
-	if l.TrackTimer != nil {
-		msg.CurrentTrack.Position = l.TrackTimer.TimePassed() + int64(time.Second)
-		msg.Timestamp = NowMillis() + int64(time.Second)
+	if l.TrackTimer != nil && msg.CurrentTrack != nil {
+		msg.CurrentTrack.Position = l.TrackTimer.TimePassed(COMMAND_DELAY)
+		msg.Timestamp = NowMillis() + COMMAND_DELAY
 	}
 	msg.TrackQueue = l.TrackQueue
 	msg.Admin = l.Admin
@@ -308,6 +336,7 @@ func (l *Lobby) setStateMessage(msg *Message) {
 
 // sendState sends the current state of the lobby to a client.
 func (l *Lobby) sendStateToAll() {
+	l.log("Sending state to all clients")
 	stateMsg := Message{}
 	l.setStateMessage(&stateMsg)
 	l.sendToAll(stateMsg)

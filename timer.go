@@ -25,6 +25,11 @@ func (mt *MillisTimer) Stop() bool {
 	return mt.timer.Stop()
 }
 
-func (mt *MillisTimer) TimePassed() int64 {
-	return time.Now().Sub(mt.start).Nanoseconds() / int64(time.Millisecond)
+// Returns the time passed since this timer started, offset by offsetMillis.
+func (mt *MillisTimer) TimePassed(offsetMillis int64) int64 {
+	return time.Now().Sub(mt.start).Nanoseconds()/int64(time.Millisecond) + offsetMillis
+}
+
+func NowMillis() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }
