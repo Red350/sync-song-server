@@ -10,7 +10,7 @@ type MillisTimer struct {
 }
 
 func NewMillisTimer(millis int64, f func()) *MillisTimer {
-	durationNanos := time.Duration(millis) * time.Millisecond
+	durationNanos := millisToDuration(millis)
 	start := time.Now()
 	return &MillisTimer{
 		timer: time.AfterFunc(durationNanos, f),
@@ -32,4 +32,8 @@ func (mt *MillisTimer) TimePassed(offsetMillis int64) int64 {
 
 func NowMillis() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+func millisToDuration(millis int64) time.Duration {
+	return time.Duration(millis) * time.Millisecond
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -256,19 +257,25 @@ func (l *Lobby) playTrack(msg *Message, track *Track) {
 	if l.TrackTimer != nil {
 		l.TrackTimer.Stop() // Stop any current timer.
 	}
-	l.log("Starting track timer: %s: %d", track.Name, track.Duration)
-	// Set the timer for one second before the end of the song.
-	// This will hopefully allow the command for the next song to arrive
-	// before the song ends, preventing Spotify from issuing its own
-	// play command.
-	l.TrackTimer = NewMillisTimer(track.Duration-1000, func() {
-		l.log("Timer ended for %s, starting next song", track.Name)
-		l.TrackTimer = nil
-		msg := Message{}
-		l.playNext(&msg)
-		l.setStateMessage(&msg)
-		l.sendToAll(msg)
+	// The track timer isn't started for 500ms, since clients won't start
+	// playing the song until that time.
+	l.log("Starting timer timer")
+	time.AfterFunc(millisToDuration(COMMAND_DELAY), func() {
+		l.log("Starting track timer: %s: %d", track.Name, track.Duration)
+		// Set the timer for one second before the end of the song.
+		// This will hopefully allow the command for the next song to arrive
+		// before the song ends, preventing Spotify from issuing its own
+		// play command.
+		l.TrackTimer = NewMillisTimer(track.Duration-1000, func() {
+			l.log("Timer ended for %s, starting next song", track.Name)
+			l.TrackTimer = nil
+			msg := Message{}
+			l.playNext(&msg)
+			l.setStateMessage(&msg)
+			l.sendToAll(msg)
+		})
 	})
+	l.log("timer timer started")
 }
 
 // playNext pops the next track from the queue, updates the database, and calls playTrack.
