@@ -277,9 +277,9 @@ func (l *Lobby) playTrack(msg *Message, track *Track) {
 
 		// Re-send the server state 5 seconds after a song has started.
 		l.log("Starting state refresh timer")
-		time.AfterFunc(millisToDuration(2000), func() {
+		time.AfterFunc(millisToDuration(5000), func() {
 			l.log("Delayed state time expired")
-			l.sendStateWithCommandToAll()
+			l.sendStateToAll()
 		})
 	})
 	l.log("timer timer started")
