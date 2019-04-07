@@ -241,11 +241,11 @@ func (l *Lobby) playTrack(msg *Message, track *Track) {
 		l.TrackTimer.Stop() // Stop any current timer.
 	}
 	l.log("Starting track timer: %s: %d", track.Name, track.Duration)
-    // Set the timer for one second before the end of the song.
-    // This will hopefully allow the command for the next song to arrive
-    // before the song ends, preventing Spotify from issuing its own
-    // play command.
-	l.TrackTimer = NewMillisTimer(track.Duration - 1000, func() {
+	// Set the timer for one second before the end of the song.
+	// This will hopefully allow the command for the next song to arrive
+	// before the song ends, preventing Spotify from issuing its own
+	// play command.
+	l.TrackTimer = NewMillisTimer(track.Duration-1000, func() {
 		l.log("Timer ended for %s, starting next song", track.Name)
 		l.TrackTimer = nil
 		msg := Message{}
@@ -306,15 +306,13 @@ func (l *Lobby) countVotes() bool {
 	return len(l.SkipVotes) > (l.NumMembers / 2)
 }
 
-// sendToAll asynchronously sends the provided message to all this lobby's clients.
+// sendToAll sends the provided message to all this lobby's clients.
 func (l *Lobby) sendToAll(msg Message) {
-	go func() {
-		for _, c := range l.Clients {
-			if err := c.Send(msg); err != nil {
-				l.log(fmt.Sprintf("Failed to send message %#v to %s: %s", msg, c.Username, err))
-			}
+	for _, c := range l.Clients {
+		if err := c.Send(msg); err != nil {
+			l.log(fmt.Sprintf("Failed to send message %#v to %s: %s", msg, c.Username, err))
 		}
-	}()
+	}
 }
 
 // setStateMessageWithCommand calls setStateMessage, but also
