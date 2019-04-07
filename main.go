@@ -55,6 +55,8 @@ func GetLobby(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(lobby)
 		}
 	}
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(Lobby{})
 }
 
 func CreateLobby(w http.ResponseWriter, r *http.Request) {
