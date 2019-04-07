@@ -274,6 +274,13 @@ func (l *Lobby) playTrack(msg *Message, track *Track) {
 			l.setStateMessage(&msg)
 			l.sendToAll(msg)
 		})
+
+		// Re-send the server state 5 seconds after a song has started.
+		l.log("Starting state refresh timer")
+		time.AfterFunc(millisToDuration(2000), func() {
+			l.log("Delayed state time expired")
+			l.sendStateWithCommandToAll()
+		})
 	})
 	l.log("timer timer started")
 }
@@ -341,7 +348,7 @@ func (l *Lobby) sendToAll(msg Message) {
 }
 
 // setStateMessageWithCommand calls setStateMessage, but also
-// adds a the relevant command to update play position.
+// adds the relevant command to update play position.
 func (l *Lobby) setStateMessageWithCommand(msg *Message) {
 	l.setStateMessage(msg)
 	if l.TrackTimer != nil && msg.CurrentTrack != nil {
@@ -366,7 +373,17 @@ func (l *Lobby) setStateMessage(msg *Message) {
 	msg.ClientNames = l.ClientNames
 }
 
-// sendState sends the current state of the lobby to a client.
+// sendStateWithCommandToAll sends the current state of the lobby to a client with
+// the relevant command to update play position.
+func (l *Lobby) sendStateWithCommandToAll() {
+	l.log("Sending state with command to all clients")
+	stateMsg := Message{}
+	l.setStateMessageWithCommand(&stateMsg)
+	l.sendToAll(stateMsg)
+}
+
+// sendStateToAll sends the current state of the lobby to a client with no
+// commands attached.
 func (l *Lobby) sendStateToAll() {
 	l.log("Sending state to all clients")
 	stateMsg := Message{}
