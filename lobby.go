@@ -165,17 +165,26 @@ func (l *Lobby) listenForClientMsgs() {
 		case VOTE_SKIP:
 			// Vote to skip works the same in all lobby modes.
 			l.log(fmt.Sprintf("Skip vote received from %s", inMsg.Username))
+
+			// Only inform the lobby if this is a new vote.
+			var newVote bool
 			if _, ok := l.SkipVotes[inMsg.Username]; !ok {
 				// Inform all users of the vote.
 				l.sendServerMessage(fmt.Sprintf("%s voted to skip.", inMsg.Username))
+				newVote = true
 			}
 			l.SkipVotes[inMsg.Username] = true
-			if l.countVotes() {
-				// Skip to the next song
-				l.log("Skip vote passed")
+
+			// Count the number of votes and either skip the song or inform the lobby
+			// of how many more votes are required.
+			successful, required := l.countVotes()
+			if successful {
 				// Inform all users that the vote passed.
-				l.sendServerMessage("Skip vote passed.")
+				l.sendServerMessageAndLog("Skip vote passed.")
+				// Skip to the next song
 				l.playNext(&outMsg)
+			} else if newVote {
+				l.sendServerMessageAndLog("%d more vote(s) required to skip.", required)
 			}
 		case PROMOTE:
 			// TODO update this to not continue, and instead send from within this function.
@@ -198,7 +207,14 @@ func (l *Lobby) listenForClientMsgs() {
 	}
 }
 
-// sendServerMessage asynchronously sends a server message to all users.
+// sendServerMessageAndLog sends the provided message to all users and logs it.
+func (l *Lobby) sendServerMessageAndLog(fmtMsg string, a ...interface{}) {
+	msg := fmt.Sprintf(fmtMsg, a...)
+	l.log(msg)
+	l.sendServerMessage(msg)
+}
+
+// sendServerMessage sends a server message to all users.
 func (l *Lobby) sendServerMessage(msg string, a ...interface{}) {
 	l.sendToAll(Message{UserMsg: fmt.Sprintf(msg, a...)})
 }
@@ -302,8 +318,10 @@ func (l *Lobby) addToQueue(track *Track) {
 }
 
 // Returns true if more than half the lobby members have voted to skip, otherwise false.
-func (l *Lobby) countVotes() bool {
-	return len(l.SkipVotes) > (l.NumMembers / 2)
+func (l *Lobby) countVotes() (bool, int) {
+	successful := len(l.SkipVotes) > (l.NumMembers / 2)
+	required := (l.NumMembers / 2) + 1 - len(l.SkipVotes)
+	return successful, required
 }
 
 // sendToAll sends the provided message to all this lobby's clients.
