@@ -23,3 +23,11 @@ go get -d -v .
 go build -v .
 ./sync-song-server
 ```
+
+## Setup with two separate containers
+
+```
+docker run --name mysql -e MYSQL_ALLOW_EMPTY_PASSWORD=true -d mysql:8
+docker cp sync-song.sql some-mysql:/sync-song.sql
+docker exec -it some-mysql /bin/bash
+```

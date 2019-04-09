@@ -26,7 +26,7 @@ create table lobby(
 create table queue(
     lobbyID varchar(4),
     trackURI varchar(100),
-    rank int(3) not null,
+    _rank int(3) not null,
 
     primary key (lobbyID, trackURI),
     foreign key (lobbyID) references lobby(id),
