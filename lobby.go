@@ -316,12 +316,8 @@ func (l *Lobby) promoteToAdmin(newAdmin string) {
 	}
 
 	l.Admin = newAdmin
-	promoteStr := fmt.Sprintf("%s promoted to admin", newAdmin)
-	promoteMsg := Message{UserMsg: promoteStr}
-	l.setStateMessage(&promoteMsg)
-
-	l.log(promoteStr)
-	l.sendToAll(promoteMsg)
+	l.sendServerMessageAndLog("%s promoted to admin", newAdmin)
+	l.sendStateToAll()
 }
 
 // addToQueue adds the provided track to the track queue.
