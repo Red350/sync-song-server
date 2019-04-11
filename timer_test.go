@@ -80,11 +80,15 @@ func TestTimePassed(t *testing.T) {
 	for _, tc := range testCases {
 		got := timer.TimePassed(tc.offset)
 		if got != tc.want {
-			t.Errorf("TimePassed returned incorrect time: go: %d, want: %d", got, tc.want)
+			t.Errorf("TimePassed returned incorrect time: got: %d, want: %d", got, tc.want)
 		}
 	}
+	replaceTimeNow(testNow)
 }
 
 func TestNowMillis(t *testing.T) {
-
+	got := NowMillis()
+	if got != 123000 {
+		t.Errorf("NowMillis returns incorrect time: got: %d, want: %d", got, 123000)
+	}
 }

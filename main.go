@@ -17,7 +17,6 @@ const ID_LENGTH = 4
 
 var Lobbies = make(map[string]*Lobby)
 
-// TODO move this to somewhere better
 // Courtesy of https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-go/31832326#31832326
 const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
