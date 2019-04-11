@@ -145,9 +145,9 @@ func (l *Lobby) listenForClientMsgs() {
 		// Though maybe its better not to, to avoid race conditions.
 		outMsg := Message{Username: inMsg.Username}
 
-		// Attach a user message to the outgoing message if exists.
+		// Send a user message to all users if exists.
 		if inMsg.UserMsg != "" {
-			outMsg.UserMsg = inMsg.UserMsg
+			l.sendUserMessage(inMsg.Username, inMsg.UserMsg)
 		}
 
 		// Parse the command and perform any necessary actions.
@@ -220,6 +220,11 @@ func (l *Lobby) sendServerMessage(msg string, a ...interface{}) {
 	l.sendToAll(Message{UserMsg: fmt.Sprintf(msg, a...)})
 }
 
+// sendUserMessage sends a user message to all users.
+func (l *Lobby) sendUserMessage(username string, msg string, a ...interface{}) {
+	l.sendToAll(Message{Username: username, UserMsg: fmt.Sprintf(msg, a...)})
+}
+
 // SetCurrentTrack sets the current track to the provided track, persists it to the database,
 // and clears any outstanding skip votes.
 func (l *Lobby) SetCurrentTrack(track *Track) {
@@ -282,7 +287,6 @@ func (l *Lobby) playTrack(msg *Message, track *Track) {
 			l.sendStateToAll()
 		})
 	})
-	l.log("timer timer started")
 }
 
 // playNext pops the next track from the queue, updates the database, and calls playTrack.
@@ -316,12 +320,8 @@ func (l *Lobby) promoteToAdmin(newAdmin string) {
 	}
 
 	l.Admin = newAdmin
-	promoteStr := fmt.Sprintf("%s promoted to admin", newAdmin)
-	promoteMsg := Message{UserMsg: promoteStr}
-	l.setStateMessage(&promoteMsg)
-
-	l.log(promoteStr)
-	l.sendToAll(promoteMsg)
+	l.sendServerMessageAndLog("%s promoted to admin", newAdmin)
+	l.sendStateToAll()
 }
 
 // addToQueue adds the provided track to the track queue.

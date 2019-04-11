@@ -30,10 +30,12 @@ func (mt *MillisTimer) TimePassed(offsetMillis int64) int64 {
 	return time.Now().Sub(mt.start).Nanoseconds()/int64(time.Millisecond) + offsetMillis
 }
 
+// NowMillis returns the current time in milliseconds.
 func NowMillis() int64 {
 	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
+// millisToDuration returns the provided time in milliseconds as a Duration.
 func millisToDuration(millis int64) time.Duration {
 	return time.Duration(millis) * time.Millisecond
 }
