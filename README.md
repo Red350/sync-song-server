@@ -1,10 +1,12 @@
 # Sync Song Server
 
+Server component of final year project.
+
 Before setting up this server, docker must be installed.
 
 A guide can be found at: https://docs.docker.com/install/
 
-## Install
+## Setup
 
 Clone the repo and cd into it.
 
@@ -27,3 +29,9 @@ Build the syng-song container:
 Run the sync-song container:
 
 `docker run -it -p 8080:8080 --network=sync-song-network --name sync-song sync-song-server:latest`
+
+## Files contributed by me.
+
+All files in this repo have been contributed by me.
+
+Any code taken from online sources is referenced with a comment above it.
