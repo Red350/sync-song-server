@@ -10,7 +10,7 @@ Clone the repo and cd into it.
 
 Create a network for the containers to communicate on:
 
-`docker create network sync-song-network`
+`docker network create sync-song-network`
 
 Run the following commands to setup the mysql container:
 
