@@ -26,7 +26,7 @@ create table lobby(
 create table queue(
     lobbyID varchar(4),
     trackURI varchar(100),
-    rank int(3) not null,
+    _rank int(3) not null,
 
     primary key (lobbyID, trackURI),
     foreign key (lobbyID) references lobby(id),
@@ -37,8 +37,8 @@ create table queue(
 #insert into track values('id1', 'song1', 'artist name 1');
 #insert into track values('id2', 'song2', 'artist name 2');
 #
-#insert into lobby values('ABCD', 'Has queue', 1, 'Rock', 1, 'id1');
-#insert into lobby values('WXYZ', 'Has track', 2, 'pop', 0, 'id2');
+#insert into lobby values('XVLB', 'Public lobby', 2, 'Rock', 1, null);
+#insert into lobby values('ZGBA', 'Private lobby', 2, 'Pop', 0, null);
 #insert into lobby values('LKJS', 'Nothing', 2, 'pop', 0, null);
 #
 #insert into queue values('ABCD', 'id1', 1);

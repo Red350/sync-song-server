@@ -1,25 +1,37 @@
-# sync-song-server
+# Sync Song Server
 
-Sync Song server
+Server component of final year project.
 
-## Building and running using docker
+Before setting up this server, docker must be installed.
 
-Clone the repo, and execute the following commands:
+A guide can be found at: https://docs.docker.com/install/
+
+## Setup
+
+Clone the repo and cd into it.
+
+Create a network for the containers to communicate on:
+
+`docker network create sync-song-network`
+
+Run the following commands to setup the mysql container:
+
+```
+docker run --network=sync-song-network -e MYSQL_ROOT_PASSWORD=sspassword --name mysql -d mysql:5.7
+docker cp sync-song.sql mysql:/sync-song.sql
+docker exec mysql /bin/bash -c "mysql -u root -psspassword < sync-song.sql"
+```
+
+Build the syng-song container:
 
 `docker build -t sync-song-server .`
 
-`docker run -it -p 8080:8080 --rm --name sync-song sync-song-server:latest`
+Run the sync-song container:
 
-## GCP dockerless setup
+`docker run -it -p 8080:8080 --network=sync-song-network --name sync-song sync-song-server:latest`
 
-Add a firewall rule for port 8080 ingress.
+## Files contributed by me.
 
-```
-sudo apt-get upgrade
-sudo apt-get install mysql-server
-sudo mysql -u root < ./sync-song.sql
-sudo apt-get install golang
-go get -d -v .
-go build -v .
-./sync-song-server
-```
+All files in this repo have been contributed by me.
+
+Any code taken from online sources is referenced with a comment above it.

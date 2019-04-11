@@ -7,7 +7,7 @@ import (
 
 // dbConn returns a connection to the database.
 func dbConn() (*sql.DB, error) {
-	db, err := sql.Open("mysql", "root:@/syncsong")
+    db, err := sql.Open("mysql", "root:sspassword@tcp(mysql:3306)/syncsong")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %s", err)
 	}
@@ -56,7 +56,7 @@ func loadFromDB(lobbies *map[string]*Lobby) error {
 			`select trackURI, name, artist from queue
             join track on(track.uri = queue.trackURI)
             where lobbyID=?
-            order by rank asc`, id)
+            order by _rank asc`, id)
 		if err != nil {
 			return fmt.Errorf("failed to query queue: %s", err)
 		}
@@ -205,7 +205,7 @@ func insertTrack(tx *sql.Tx, track *Track) error {
 // queueTrack inserts a row to the Queue table with the provided values.
 func queueTrack(tx *sql.Tx, lobbyID string, uri string, rank int) error {
 	stmt, err := tx.Prepare(`
-        insert into queue(lobbyID, trackURI, rank)
+        insert into queue(lobbyID, trackURI, _rank)
         values(?, ?, ?)`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare queue statement: %s", err)
